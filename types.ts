@@ -1,0 +1,134 @@
+
+export interface Exercise {
+  name: string;
+  repetitions: string;
+  rest: string;
+  gifUrl?: string; // Added field for GIF URL
+}
+
+export interface TrainingDay {
+  id: number; // <-- ¡AÑADE ESTA LÍNEA!
+  dayName: string; // e.g., "Día 1"
+  exercises: Exercise[];
+  notes?: string; // For "Actividad libre" or other specific notes
+}
+
+export interface TrainingWeek {
+  weekNumber: number;
+  title: string;
+  days: TrainingDay[];
+}
+
+export interface AppData {
+  programName: string;
+  trainerName: string;
+  objective: string;
+  postWorkoutStretch: {
+    label: string;
+    url: string;
+  };
+  weeks: TrainingWeek[];
+}
+
+export type ExercisePerformanceData = Record<number, number>; // exerciseIndex -> secondsSpent
+export type Coordinate = { lat: number; lng: number; timestamp: number };
+export type ExerciseRoutesData = Record<number, Coordinate[]>; // exerciseIndex -> array of coordinates
+
+export interface PausedSessionState {
+  weekNumber: number;
+  dayName: string;
+  exerciseIndex: number;
+  phase: 'EXERCISE' | 'REST';
+  timeLeftInSeconds: number;
+  initialDurationInSeconds: number;
+  // No need to store exerciseActualDurations or exerciseRoutes here as they are accumulated/restarted
+}
+
+export interface GuidedSessionViewProps {
+  day: TrainingDay;
+  onClose: (
+    reason?: 'completed' | 'closed_manually', 
+    completedIndicesInRun?: number[], 
+    exerciseActualDurations?: ExercisePerformanceData,
+    exerciseRoutes?: ExerciseRoutesData // Added exercise routes
+  ) => void;
+  onPauseAndExit: (
+    currentState: Omit<PausedSessionState, 'weekNumber' | 'dayName'>, 
+    completedIndicesInRun: number[], 
+    exerciseActualDurations?: ExercisePerformanceData,
+    exerciseRoutes?: ExerciseRoutesData // Added exercise routes
+  ) => void;
+  initialState?: PausedSessionState | null;
+  postWorkoutStretchUrl: string;
+}
+
+// --- Authentication Types ---
+export type UserRole = 'ENTRENADOR' | 'JUGADOR';
+export type PlayerTeam = 'Infantil' | 'Cadete' | 'Juvenil';
+
+export interface User {
+  nombreCompleto: string;
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  rol: UserRole;
+  team?: PlayerTeam; // Only for players
+  accessCode?: string; // Added for players to store their unique access code
+}
+
+export interface AuthContextType {
+  currentUser: User | null;
+  login: (email: string, password_DO_NOT_USE_IN_REAL_APP: string) => Promise<User | null>;
+  register: (
+    email: string,
+    password_DO_NOT_USE_IN_REAL_APP: string,
+    role: UserRole,
+    details: {
+      firstName?: string; // Required if admin
+      lastName?: string;  // Required if admin
+      team?: PlayerTeam;  // Required if player
+      adminCode?: string; // Required if admin for registration
+      playerAccessCode?: string; // Required if player for registration
+    }
+  ) => Promise<User | null>;
+  logout: () => void;
+  loading: boolean;
+}
+
+// --- User Progress Types ---
+export interface ActivityLibreDetails {
+  activityType: string;
+  timeSpent: string;
+}
+
+export interface UserDayProgress {
+  userId: string; 
+  dayKey: string; // "week<N>-day<DayName>" e.g., "week1-Día 1"
+  completedExerciseIndices: number[]; // For structured days
+  allExercisesCompleted: boolean;
+  completedAt?: string; // ISO string, set when allExercisesCompleted becomes true
+  activityLibreDetails?: ActivityLibreDetails; // For "Actividad libre" days
+  exerciseActualDurations?: ExercisePerformanceData; // To store time spent on each exercise
+  exerciseRoutes?: ExerciseRoutesData; // To store GPS routes for specific exercises
+}
+
+// --- API Service Types ---
+export interface SessionFeedbackData {
+  userId: string;
+  userFirstName: string;
+  userLastName: string;
+  weekNumber: number;
+  dayName: string;
+  feedbackEmoji: string;
+  feedbackLabel: string;
+  completedAt: string; // ISO date string
+  activityLibreDetails?: ActivityLibreDetails; // Added for free activity feedback
+  exerciseActualDurations?: ExercisePerformanceData; // Time spent on exercises for this session
+  exerciseRoutes?: ExerciseRoutesData; // GPS routes for specific exercises
+}
+
+// Props for AdminDashboardView
+export interface PlayerFeedbackDisplay extends SessionFeedbackData {
+  id: string; // Unique ID for the feedback entry itself
+}

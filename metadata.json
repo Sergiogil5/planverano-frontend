@@ -1,0 +1,8 @@
+{
+  "name": "One Peak - Juntos a la cima",
+  "description": "One Peak - Juntos a la cima: Tu compañero de entrenamiento para alcanzar tus metas.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "prompt": ""
+}

@@ -39,7 +39,7 @@ const AuthView: React.FC = () => {
             return;
           }
           registrationDetails.playerAccessCode = playerAccessCode;
-          registrationDetails.categoria = team;
+          registrationDetails.team = team;
         } else if (role === 'ENTRENADOR') {
           if (!firstName.trim() || !lastName.trim()) {
             setError("Nombre y apellidos son requeridos para el rol de Entrenador.");
@@ -135,8 +135,8 @@ const AuthView: React.FC = () => {
                         <input id="playerAccessCode" name="playerAccessCode" type="text" required value={playerAccessCode} onChange={(e) => setPlayerAccessCode(e.target.value)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Introduce tu código" disabled={loading}/>
                       </div>
                       <div>
-                        <label htmlFor="categoria" className="block text-sm font-medium text-gray-700">Equipo</label>
-                        <select id="categoria" name="categoria" value={team} onChange={(e) => setTeam(e.target.value as PlayerTeam)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" disabled={loading}>
+                        <label htmlFor="team" className="block text-sm font-medium text-gray-700">Equipo</label>
+                        <select id="team" name="team" value={team} onChange={(e) => setTeam(e.target.value as PlayerTeam)} className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" disabled={loading}>
                           <option value="Infantil">Infantil</option>
                           <option value="Cadete">Cadete</option>
                           <option value="Juvenil">Juvenil</option>

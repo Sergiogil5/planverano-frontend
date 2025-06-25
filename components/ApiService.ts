@@ -42,7 +42,7 @@ const ApiService = {
             email,
             password: password_DO_NOT_USE_IN_REAL_APP,
             codigoRegistro: details.playerAccessCode,
-            categoria: details.team
+            team: details.team
             // ¡NO incluimos el campo nombreCompleto para el jugador!
         };
     } else { // role === 'admin'

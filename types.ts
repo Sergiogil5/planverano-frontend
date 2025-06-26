@@ -69,12 +69,10 @@ export type PlayerTeam = 'Infantil' | 'Cadete' | 'Juvenil';
 export interface User {
   nombreCompleto: string;
   id: string;
-  firstName: string;
-  lastName: string;
   email: string;
   rol: UserRole;
   team?: PlayerTeam; // Only for players
-  accessCode?: string; // Added for players to store their unique access code
+  codigoRegistro?: string; // Added for players to store their unique access code
 }
 
 export interface AuthContextType {
@@ -116,8 +114,7 @@ export interface UserDayProgress {
 // --- API Service Types ---
 export interface SessionFeedbackData {
   userId: string;
-  userFirstName: string;
-  userLastName: string;
+  userNombreCompleto: string; // <-- CAMBIO
   weekNumber: number;
   dayName: string;
   feedbackEmoji: string;

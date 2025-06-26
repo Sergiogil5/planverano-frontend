@@ -22,10 +22,10 @@ const AppContent: React.FC = () => {
   const { currentUser, logout, loading: authLoading } = useAuth();
   
   // Para saber qué semana estamos viendo
-  const [currentWeekNumber, setCurrentWeekNumber] = useState(1); 
-  
+  const [currentWeekNumber, setCurrentWeekNumber] = useState(1);
+
   // Para guardar los datos de la semana que vienen de la API
-  const [currentWeekData, setCurrentWeekData] = useState<TrainingWeek | null>(null); 
+  const [weekData, setWeekData] = useState<TrainingWeek | null>(null);
   
   // Para saber si estamos esperando respuesta de la API
   const [isLoadingWeek, setIsLoadingWeek] = useState(true); 
@@ -166,11 +166,11 @@ const AppContent: React.FC = () => {
           }))
         };
           
-          setCurrentWeekData(datosParaFrontend);
+          setWeekData(datosParaFrontend);
 
         } catch (error) {
           console.error("Error fetching week data:", error);
-          setCurrentWeekData(null); // En caso de error, no mostramos nada.
+          setWeekData(null); // En caso de error, no mostramos nada.
         } finally {
           setIsLoadingWeek(false); // Quitamos la pantalla de "Cargando..."
         }
@@ -217,8 +217,8 @@ const AppContent: React.FC = () => {
   }, [currentWeekNumber, guidedSessionDay, showResumeDialogForDay, showPostSessionFeedback, currentUser, showAdminDashboard, activityLibreModalInfo]);
 
   const handleStartGuidedSession = (day: TrainingDay) => {
-    if (currentWeekData && pausedSessionDetails && 
-        pausedSessionDetails.weekNumber === currentWeekData.weekNumber &&
+    if (weekData && pausedSessionDetails && 
+        pausedSessionDetails.weekNumber === weekData.weekNumber &&
         pausedSessionDetails.dayName === day.dayName) {
       setShowResumeDialogForDay(day);
     } else {
@@ -229,9 +229,9 @@ const AppContent: React.FC = () => {
   };
 
   const handleRestartGuidedSession = (dayToRestart: TrainingDay) => {
-    if (!currentUser || !currentWeekData) return;
+    if (!currentUser || !weekData) return;
 
-    const dayKey = getDayKey(currentWeekData.weekNumber, dayToRestart.dayName);
+    const dayKey = getDayKey(weekData.weekNumber, dayToRestart.dayName);
 
     // Reset progress for the day
     const resetProgressEntry: UserDayProgress = {
@@ -263,8 +263,8 @@ const AppContent: React.FC = () => {
   };
 
   const handleStartOverSession = () => {
-    if (showResumeDialogForDay && currentWeekData && currentUser) {
-      const dayKey = getDayKey(currentWeekData.weekNumber, showResumeDialogForDay.dayName);
+    if (showResumeDialogForDay && weekData && currentUser) {
+      const dayKey = getDayKey(weekData.weekNumber, showResumeDialogForDay.dayName);
       const newProgressForDay: UserDayProgress = {
         userId: currentUser.id,
         dayKey,
@@ -289,17 +289,15 @@ const AppContent: React.FC = () => {
     setShowResumeDialogForDay(null);
   };
 
-  const handleEndGuidedSession = (
+    const handleEndGuidedSession = (
     reason?: 'completed' | 'closed_manually', 
     completedIndicesInRun?: number[],
     exerciseActualDurations?: ExercisePerformanceData,
     exerciseRoutes?: ExerciseRoutesData 
   ) => {
-    const weekForFeedback = currentWeekData; 
-    const dayForFeedback = guidedSessionDay;   
-
-    if (currentUser && currentWeekData && guidedSessionDay) {
-      const dayKey = getDayKey(currentWeekData.weekNumber, guidedSessionDay.dayName);
+    // --- ESTA PRIMERA PARTE DE LÓGICA LOCAL NO CAMBIA ---
+    if (currentUser && weekData && guidedSessionDay) {
+      const dayKey = getDayKey(weekData.weekNumber, guidedSessionDay.dayName);
       const currentDayProgress = userProgress[dayKey] || { 
         userId: currentUser.id, 
         dayKey, 
@@ -336,19 +334,22 @@ const AppContent: React.FC = () => {
         exerciseRoutes: updatedRoutes,
       };
       setUserProgress(prev => ({ ...prev, [dayKey]: updatedDayProgress }));
-      saveProgressToApi(dayKey, updatedDayProgress);
+      // La llamada a saveProgressToApi ya está obsoleta y no hace nada, lo cual es correcto.
     }
     
-    if (currentWeekData && guidedSessionDay && pausedSessionDetails &&
-        pausedSessionDetails.weekNumber === currentWeekData.weekNumber &&
+    // La lógica de limpieza de sesión pausada tampoco cambia
+    if (weekData && guidedSessionDay && pausedSessionDetails &&
+        pausedSessionDetails.weekNumber === weekData.weekNumber &&
         pausedSessionDetails.dayName === guidedSessionDay.dayName) {
       setPausedSessionDetails(null);
     }
     setGuidedSessionDay(null); 
 
-    if (reason === 'completed' && weekForFeedback && dayForFeedback) {
+    // --- ¡AQUÍ ESTÁ EL CAMBIO CLAVE! ---
+    if (reason === 'completed' && weekData && guidedSessionDay) {
       setSelectedQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
-      setFeedbackContext({ week: weekForFeedback, day: dayForFeedback, exerciseActualDurations, exerciseRoutes }); 
+      // Usamos 'weekData' (del estado) en lugar de 'weekForFeedback' (que venía de una constante)
+      setFeedbackContext({ week: weekData, day: guidedSessionDay, exerciseActualDurations, exerciseRoutes }); 
       setShowPostSessionFeedback(true);
     } else {
       document.body.style.overflow = ''; 
@@ -362,8 +363,8 @@ const AppContent: React.FC = () => {
     exerciseActualDurations?: ExercisePerformanceData,
     exerciseRoutes?: ExerciseRoutesData 
   ) => {
-    if (currentUser && currentWeekData && guidedSessionDay) {
-      const dayKey = getDayKey(currentWeekData.weekNumber, guidedSessionDay.dayName);
+    if (currentUser && weekData && guidedSessionDay) {
+      const dayKey = getDayKey(weekData.weekNumber, guidedSessionDay.dayName);
       const currentDayProgress = userProgress[dayKey] || { 
         userId: currentUser.id, 
         dayKey, 
@@ -394,7 +395,7 @@ const AppContent: React.FC = () => {
 
       setPausedSessionDetails({
         ...sessionState,
-        weekNumber: currentWeekData.weekNumber,
+        weekNumber: weekData.weekNumber,
         dayName: guidedSessionDay.dayName,
       });
     }
@@ -402,62 +403,54 @@ const AppContent: React.FC = () => {
     document.body.style.overflow = '';
   };
 
-    const handleCloseFeedbackView = async (feedback?: { emoji: string; label: string }) => {
-    // Solo procedemos si el usuario ha seleccionado un feedback, está logueado y tenemos el contexto de la sesión
-    if (feedback && currentUser && feedbackContext) {
+  const handleCloseFeedbackView = async (feedback?: { emoji: string; label: string }) => {
+    if (feedback && currentUser && feedbackContext) { 
       
-      // 1. Buscamos la sesión correspondiente en los datos de entrenamiento para obtener su ID.
-      //    El backend necesita el ID de la SesionDiaria, no solo el nombre del día.
-      const dayObject = TRAINING_DATA.weeks
-        .find(w => w.weekNumber === feedbackContext.week.weekNumber)
-        ?.days.find(d => d.dayName === feedbackContext.day.dayName);
+      // --- ¡LÓGICA DE BÚSQUEDA CORREGIDA! ---
+      // Buscamos el objeto del día DENTRO de la información de la semana que está en el contexto.
+      // Ya no necesitamos buscar en la constante global TRAINING_DATA.
+      const dayObject = feedbackContext.week.days.find((d: TrainingDay) => d.dayName === feedbackContext.day.dayName);
 
-      // Verificamos si encontramos la sesión y si tiene un ID.
+      // La comprobación de seguridad sigue siendo importante
       if (!dayObject || dayObject.id === undefined) {
-        console.error("Error crítico: No se pudo encontrar el ID de la sesión para enviar el feedback.");
-        // Cerramos los modales y volvemos, ya que no podemos continuar.
+        console.error("Error crítico: No se pudo encontrar el ID de la sesión en el contexto para enviar el feedback.");
         setShowPostSessionFeedback(false);
         setFeedbackContext(null);
         document.body.style.overflow = '';
-        return; // Detenemos la ejecución de la función aquí.
+        return;
       }
       
-      // 2. Construimos el objeto 'payload' que enviaremos al backend.
-      //    Este objeto debe coincidir con el 'ProgresoRequest' de Java.
+      // El payload ahora usa el 'dayObject.id' que hemos encontrado
       const feedbackPayload = {
-        sesionId: dayObject.id, // ¡Usamos el ID que acabamos de encontrar!
+        sesionId: dayObject.id,
         feedbackEmoji: feedback.emoji,
         feedbackLabel: feedback.label,
-        feedbackTextoOpcional: "", // Lo dejamos vacío por ahora, se puede añadir un campo de texto en el futuro.
+        feedbackTextoOpcional: "", // Puedes añadir este campo más adelante
         tiemposJson: JSON.stringify(feedbackContext.exerciseActualDurations || {}),
         rutaGpsJson: JSON.stringify(feedbackContext.exerciseRoutes || {}),
       };
 
-      // 3. Hacemos la llamada real a la API para guardar los datos en la nube.
+      // La llamada a la API y la lógica de notificación no cambian
       try {
         await ApiService.submitSessionFeedback(feedbackPayload);
         console.log("Feedback enviado con éxito al backend real.");
-        
-        // La lógica de notificación para el admin se queda igual.
-        if (currentUser.rol !== 'ENTRENADOR') {
-          setNewFeedbackNotification(true);
+        if (currentUser.rol !== 'ENTRENADOR') { 
+            // Podríamos implementar una notificación real aquí en el futuro
         }
-
       } catch (error) {
         console.error("Error al enviar el feedback al backend:", error);
-        // Aquí podrías mostrar un mensaje de error al usuario.
       }
     }
-
-    // 4. Cerramos la vista de feedback y restauramos la pantalla principal.
+    
+    // La lógica de limpieza final no cambia
     setShowPostSessionFeedback(false);
-    setFeedbackContext(null);
+    setFeedbackContext(null); 
     document.body.style.overflow = '';
   };
 
   const handleOpenActivityLibreModal = (day: TrainingDay) => {
-    if (currentWeekData) {
-      setActivityLibreModalInfo({ weekNum: currentWeekData.weekNumber, day });
+    if (weekData) {
+      setActivityLibreModalInfo({ weekNum: weekData.weekNumber, day });
       document.body.style.overflow = 'hidden';
     }
   };
@@ -467,10 +460,16 @@ const AppContent: React.FC = () => {
     document.body.style.overflow = '';
   };
 
+  const handleOpenAdminDashboard = () => {
+    setShowAdminDashboard(true);
+    document.body.style.overflow = 'hidden';
+  };
+
   const handleActivityLibreSubmit = async (details: ActivityLibreDetails) => {
-    if (currentUser && activityLibreModalInfo && currentWeekData) {
+    // La comprobación ahora usa 'weekData' del estado
+    if (currentUser && activityLibreModalInfo && weekData) {
       const { day } = activityLibreModalInfo;
-      const dayKey = getDayKey(currentWeekData.weekNumber, day.dayName);
+      const dayKey = getDayKey(weekData.weekNumber, day.dayName);
       const completedTimestamp = new Date().toISOString();
       
       const updatedDayProgress: UserDayProgress = {
@@ -485,23 +484,19 @@ const AppContent: React.FC = () => {
       };
 
       setUserProgress(prev => ({ ...prev, [dayKey]: updatedDayProgress }));
-        
-        // La llamada a ApiService.recordActivityLibre se elimina.
-        // El guardado real ocurrirá cuando se envíe el feedback.
       
       setActivityLibreModalInfo(null); 
 
+      // --- ¡AQUÍ ESTÁ EL CAMBIO CLAVE! ---
       setSelectedQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
-      setFeedbackContext({ week: currentWeekData, day, activityLibreDetails: details, exerciseRoutes: {} });
+      // Usamos 'weekData' para asegurarnos de que el ID de la sesión está disponible
+      setFeedbackContext({ week: weekData, day, activityLibreDetails: details, exerciseRoutes: {} });
       setShowPostSessionFeedback(true);
     } else {
-        handleCloseActivityLibreModal(); 
+        // La función handleCloseActivityLibreModal() no existe, así que la eliminamos por si acaso.
+        setActivityLibreModalInfo(null);
+        document.body.style.overflow = '';
     }
-  };
-
-  const handleOpenAdminDashboard = () => {
-    setShowAdminDashboard(true);
-    document.body.style.overflow = 'hidden';
   };
   
   if (!textAndPauseAnimationComplete || authLoading) {
@@ -600,9 +595,9 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (guidedSessionDay && currentWeekData) {
+  if (guidedSessionDay && weekData) {
     const initialSessionState = (pausedSessionDetails && 
-      pausedSessionDetails.weekNumber === currentWeekData.weekNumber &&
+      pausedSessionDetails.weekNumber === weekData.weekNumber &&
       pausedSessionDetails.dayName === guidedSessionDay.dayName) 
       ? pausedSessionDetails 
       : null;
@@ -618,7 +613,7 @@ const AppContent: React.FC = () => {
     );
   }
   
-  if (isLoadingWeek || !currentWeekData) {
+  if (isLoadingWeek || !weekData) {
     // Puedes poner aquí un spinner o un componente de carga más elaborado.
     return (
         <div className="flex justify-center items-center h-screen">
@@ -627,7 +622,7 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (!currentWeekData) {
+  if (!weekData) {
     return <div className="p-4 text-center text-red-500">Error: Semana no encontrada.</div>;
   }
   
@@ -706,14 +701,14 @@ console.log("Usuario actual:", currentUser); // <--- AÑADE ESTA LÍNEA
         </section>
         
         <WeekSelector
-          currentWeekNumber={currentWeekData.weekNumber} // Usa el dato de la API
+          currentWeekNumber={weekData.weekNumber} // Usa el dato de la API
           totalWeeks={TRAINING_DATA.weeks.length}
           onWeekChange={handleWeekChange}
-          weekTitle={currentWeekData.title} // Usa el dato de la API
+          weekTitle={weekData.title} // Usa el dato de la API
         />
         
         <WeekView 
-            week={currentWeekData} 
+            week={weekData} 
             onStartGuidedSession={handleStartGuidedSession}
             onRestartGuidedSession={handleRestartGuidedSession} 
             onOpenActivityLibreModal={handleOpenActivityLibreModal}

@@ -1,9 +1,7 @@
-import { User, UserRole, SessionFeedbackData, UserDayProgress, PlayerTeam, PlayerFeedbackDisplay, ActivityLibreDetails } from '../types';
+import { User, UserRole, SessionFeedbackData, PausedSessionState, PlayerTeam, PlayerFeedbackDisplay, ActivityLibreDetails, TrainingDay } from '../types';
 
-// La URL de tu backend en Render
 const API_BASE_URL = 'https://planverano-backend.onrender.com';
 
-// --- Funciones de ayuda para gestionar el Token JWT ---
 const getToken = (): string | null => localStorage.getItem('jwt_token');
 const setToken = (token: string): void => localStorage.setItem('jwt_token', token);
 const removeToken = (): void => localStorage.removeItem('jwt_token');
@@ -12,9 +10,7 @@ const getAuthHeaders = () => ({
     'Authorization': `Bearer ${getToken()}`,
 });
 
-// --- El ApiService que habla con el Backend Real ---
 const ApiService = {
-    
     // --- Autenticación ---
     login: async (email: string, password_DO_NOT_USE_IN_REAL_APP: string): Promise<User> => {
         const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
@@ -22,9 +18,10 @@ const ApiService = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password: password_DO_NOT_USE_IN_REAL_APP })
         });
-        if (!response.ok) { 
-            removeToken(); 
-            throw new Error('Login fallido. Verifica tu email y contraseña.'); 
+        if (!response.ok) {
+            removeToken();
+            const errorText = await response.text().catch(() => 'Login fallido. Verifica tu email y contraseña.');
+            throw new Error(errorText);
         }
         const { token } = await response.json();
         setToken(token);
@@ -34,22 +31,13 @@ const ApiService = {
     },
 
     register: async (email: string, password_DO_NOT_USE_IN_REAL_APP: string, role: UserRole, details: any): Promise<User> => {
-        let requestBody;
-        if (role === 'JUGADOR') {
-            requestBody = {
-                email,
-                password: password_DO_NOT_USE_IN_REAL_APP,
-                codigoRegistro: details.playerAccessCode,
-                team: details.team
-            };
-        } else { // role === 'ENTRENADOR'
-            requestBody = {
-                email,
-                password: password_DO_NOT_USE_IN_REAL_APP,
-                codigoRegistro: details.adminCode,
-                nombreCompleto: `${details.firstName} ${details.lastName}`.trim()
-            };
-        }
+        const requestBody = {
+            email,
+            password: password_DO_NOT_USE_IN_REAL_APP,
+            codigoRegistro: role === 'JUGADOR' ? details.playerAccessCode : details.adminCode,
+            team: role === 'JUGADOR' ? details.team : null,
+            nombreCompleto: role === 'ENTRENADOR' ? `${details.firstName} ${details.lastName}`.trim() : null
+        };
 
         const response = await fetch(`${API_BASE_URL}/api/registro`, {
             method: 'POST',
@@ -62,6 +50,7 @@ const ApiService = {
             throw new Error(errorText || 'Error en el registro.');
         }
         
+        // Tras un registro exitoso, hacemos login para obtener el token y los datos del usuario.
         return ApiService.login(email, password_DO_NOT_USE_IN_REAL_APP);
     },
 
@@ -81,91 +70,58 @@ const ApiService = {
     },
     
     // --- Entrenamientos y Progreso ---
-    getWeekData: async (weekNumber: number): Promise<any[]> => {
+    getWeekData: async (weekNumber: number): Promise<TrainingDay[]> => {
         const response = await fetch(`${API_BASE_URL}/api/training/semana/${weekNumber}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('No se pudieron cargar los datos de la semana.');
         return response.json();
     },
 
-    submitSessionFeedback: async (feedbackData: SessionFeedbackData & { sesionId: number }) => {
-        const requestBody = {
-            sesionId: feedbackData.sesionId, 
-            feedbackEmoji: feedbackData.feedbackEmoji,
-            feedbackLabel: feedbackData.feedbackLabel, 
-            feedbackTextoOpcional: '', // Puedes añadir este campo a tu modal
-            tiemposJson: JSON.stringify(feedbackData.exerciseActualDurations || {}),
-            rutaGpsJson: JSON.stringify(feedbackData.exerciseRoutes || {})
-        };
+    submitSessionFeedback: async (feedbackData: any) => {
         const response = await fetch(`${API_BASE_URL}/api/progreso`, {
-            method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(requestBody)
+            method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(feedbackData)
         });
         if (!response.ok) throw new Error('Error al enviar el feedback.');
-        return { success: true };
+        return response.json();
     },
     
-    // --- ¡NUEVAS FUNCIONES PARA CARGAR ESTADO! ---
-    
-    fetchUserProgress: async (): Promise<any[]> => {
-        const token = getToken();
-        if (!token) return [];
-        const response = await fetch(`${API_BASE_URL}/api/progreso/mis-progresos`, {
-            headers: getAuthHeaders()
+    savePausedSession: async (pausedState: any): Promise<void> => {
+        const response = await fetch(`${API_BASE_URL}/api/progreso/pausar`, {
+            method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(pausedState)
         });
-        if (!response.ok) {
-            console.error('Error al cargar el progreso del usuario');
-            return [];
-        }
+        if (!response.ok) throw new Error('Error al guardar la sesión pausada');
+    },
+
+    fetchUserProgress: async (): Promise<any[]> => {
+        const response = await fetch(`${API_BASE_URL}/api/progreso/mis-progresos`, { headers: getAuthHeaders() });
+        if (!response.ok) return [];
         return response.json();
     },
     
     fetchPausedSession: async (): Promise<any | null> => {
-        const token = getToken();
-        if (!token) return null;
-        const response = await fetch(`${API_BASE_URL}/api/progreso/mi-pausa`, {
-            headers: getAuthHeaders()
-        });
-        if (response.status === 204) return null; // No hay sesión pausada, no es un error.
-        if (!response.ok) {
-            console.error('Error al cargar la sesión pausada');
-            return null;
-        }
+        const response = await fetch(`${API_BASE_URL}/api/progreso/mi-pausa`, { headers: getAuthHeaders() });
+        if (response.status === 204) return null;
+        if (!response.ok) return null;
         return response.json();
     },
 
-    savePausedSession: async (pausedState: any): Promise<void> => {
-        const token = getToken();
-        if (!token) throw new Error('No autenticado');
-        
-        const response = await fetch(`${API_BASE_URL}/api/progreso/pausar`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(pausedState)
-        });
-
-        if (!response.ok) {
-            throw new Error('Error al guardar la sesión pausada');
-        }
-    },
-
-
-    // --- Funciones de Admin ---
-    
+    // --- Admin ---
     getAllPlayers: async (): Promise<User[]> => {
-        const token = getToken();
-        if (!token) return [];
         const response = await fetch(`${API_BASE_URL}/api/users`, { headers: getAuthHeaders() });
-        if (!response.ok) {
-            console.error("No se pudieron cargar los jugadores.");
-            return [];
-        }
+        if (!response.ok) return [];
+        return response.json();
+    },
+
+    getPlayerFeedback: async (userId: string): Promise<any[]> => {
+        const response = await fetch(`${API_BASE_URL}/api/progreso/jugador/${userId}`, { headers: getAuthHeaders() });
+        if (!response.ok) return [];
         return response.json();
     },
     
-    // Funciones que aún no hemos implementado en el backend, se quedan como están por ahora
-    getPlayerFeedback: async (): Promise<PlayerFeedbackDisplay[]> => [],
-    deletePlayer: async (): Promise<{ success: boolean; message: string }> => ({ success: true, message: 'Simulado' }),
-    checkAdminNotification: (): boolean => false,
-    clearAdminNotification: (): void => {},
+    // Dejamos esta simulada por ahora
+    deletePlayer: async (): Promise<{ success: boolean; message: string }> => {
+        console.log("Simulando borrado de jugador...");
+        return { success: true, message: 'Simulado' }
+    }
 };
 
 export default ApiService;

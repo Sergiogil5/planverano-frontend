@@ -200,26 +200,7 @@ const AppContent: React.FC = () => {
 
 
 
-  useEffect(() => {
-    if (currentUser?.rol === 'ENTRENADOR') {
-      const checkNotification = () => {
-        const hasNotification = ApiService.checkAdminNotification();
-        setNewFeedbackNotification(hasNotification);
-      };
-      checkNotification(); 
-      const interval = setInterval(checkNotification, 5000); 
-      window.addEventListener('focus', checkNotification);
-      return () => {
-        clearInterval(interval);
-        window.removeEventListener('focus', checkNotification);
-      };
-    } else {
-      setNewFeedbackNotification(false);
-    }
-  }, [currentUser]);
-
-
-  const saveProgressToApi = useCallback(async (dayKey: string, progressEntry: UserDayProgress) => {
+    const saveProgressToApi = useCallback(async (dayKey: string, progressEntry: UserDayProgress) => {
     if (currentUser) {
       console.log("Guardado de progreso parcial localmente:", progressEntry); 
     }
@@ -421,33 +402,56 @@ const AppContent: React.FC = () => {
     document.body.style.overflow = '';
   };
 
-  const handleCloseFeedbackView = async (feedback?: { emoji: string; label: string }) => {
-    if (feedback && currentUser && feedbackContext) { 
-        const feedbackPayload = {
-            sesionId: feedbackContext.day.id, // <-- ¡ASEGÚRATE DE QUE ESTA LÍNEA EXISTE!
-            userId: currentUser.id,
-            userNombreCompleto: currentUser.nombreCompleto, // <-- CORREGIDO
-            weekNumber: feedbackContext.week.weekNumber,
-            dayName: feedbackContext.day.dayName,
-            feedbackEmoji: feedback.emoji,
-            feedbackLabel: feedback.label,
-            completedAt: new Date().toISOString(),
-            activityLibreDetails: feedbackContext.activityLibreDetails,
-            exerciseActualDurations: feedbackContext.exerciseActualDurations,
-            exerciseRoutes: feedbackContext.exerciseRoutes,
-        };
-        try {
-            await ApiService.submitSessionFeedback(feedbackPayload);
-            if (currentUser.rol !== 'ENTRENADOR') { 
-                 setNewFeedbackNotification(true); 
-            }
-            console.log("Feedback submitted via mock API.");
-        } catch (error) {
-            console.error("Error submitting feedback:", error);
+    const handleCloseFeedbackView = async (feedback?: { emoji: string; label: string }) => {
+    // Solo procedemos si el usuario ha seleccionado un feedback, está logueado y tenemos el contexto de la sesión
+    if (feedback && currentUser && feedbackContext) {
+      
+      // 1. Buscamos la sesión correspondiente en los datos de entrenamiento para obtener su ID.
+      //    El backend necesita el ID de la SesionDiaria, no solo el nombre del día.
+      const dayObject = TRAINING_DATA.weeks
+        .find(w => w.weekNumber === feedbackContext.week.weekNumber)
+        ?.days.find(d => d.dayName === feedbackContext.day.dayName);
+
+      // Verificamos si encontramos la sesión y si tiene un ID.
+      if (!dayObject || dayObject.id === undefined) {
+        console.error("Error crítico: No se pudo encontrar el ID de la sesión para enviar el feedback.");
+        // Cerramos los modales y volvemos, ya que no podemos continuar.
+        setShowPostSessionFeedback(false);
+        setFeedbackContext(null);
+        document.body.style.overflow = '';
+        return; // Detenemos la ejecución de la función aquí.
+      }
+      
+      // 2. Construimos el objeto 'payload' que enviaremos al backend.
+      //    Este objeto debe coincidir con el 'ProgresoRequest' de Java.
+      const feedbackPayload = {
+        sesionId: dayObject.id, // ¡Usamos el ID que acabamos de encontrar!
+        feedbackEmoji: feedback.emoji,
+        feedbackLabel: feedback.label,
+        feedbackTextoOpcional: "", // Lo dejamos vacío por ahora, se puede añadir un campo de texto en el futuro.
+        tiemposJson: JSON.stringify(feedbackContext.exerciseActualDurations || {}),
+        rutaGpsJson: JSON.stringify(feedbackContext.exerciseRoutes || {}),
+      };
+
+      // 3. Hacemos la llamada real a la API para guardar los datos en la nube.
+      try {
+        await ApiService.submitSessionFeedback(feedbackPayload);
+        console.log("Feedback enviado con éxito al backend real.");
+        
+        // La lógica de notificación para el admin se queda igual.
+        if (currentUser.rol !== 'ENTRENADOR') {
+          setNewFeedbackNotification(true);
         }
+
+      } catch (error) {
+        console.error("Error al enviar el feedback al backend:", error);
+        // Aquí podrías mostrar un mensaje de error al usuario.
+      }
     }
+
+    // 4. Cerramos la vista de feedback y restauramos la pantalla principal.
     setShowPostSessionFeedback(false);
-    setFeedbackContext(null); 
+    setFeedbackContext(null);
     document.body.style.overflow = '';
   };
 
@@ -497,8 +501,6 @@ const AppContent: React.FC = () => {
 
   const handleOpenAdminDashboard = () => {
     setShowAdminDashboard(true);
-    ApiService.clearAdminNotification();
-    setNewFeedbackNotification(false);
     document.body.style.overflow = 'hidden';
   };
   

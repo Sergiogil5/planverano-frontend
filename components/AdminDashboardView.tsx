@@ -4,6 +4,7 @@ import { User, PlayerTeam } from '../types';
 import XCircleIcon from './icons/XCircleIcon';
 import PlayerFeedbackDetailView from './PlayerFeedbackDetailView';
 
+// La configuración de colores y orden no cambia
 const teamColors: Record<PlayerTeam, { bg: string; text: string; headerBg: string; headerText: string }> = {
   Infantil: { bg: 'bg-sky-600', text: 'text-white', headerBg: 'bg-sky-700', headerText: 'text-sky-100' },
   Cadete: { bg: 'bg-emerald-600', text: 'text-white', headerBg: 'bg-emerald-700', headerText: 'text-emerald-100' },
@@ -17,6 +18,7 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [viewingFeedbackForPlayer, setViewingFeedbackForPlayer] = useState<User | null>(null);
 
+  // useEffect para cargar la lista de jugadores cuando el componente se monta
   useEffect(() => {
     if (!viewingFeedbackForPlayer) {
       const fetchPlayers = async () => {
@@ -37,22 +39,27 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   }, [viewingFeedbackForPlayer]);
 
+  // useMemo para agrupar los jugadores por equipo cada vez que la lista 'allPlayers' cambia
   const groupedPlayers = useMemo(() => {
+    // 1. Inicializamos un objeto con un array vacío para cada equipo
     const groups: Record<PlayerTeam, User[]> = {
       Infantil: [],
       Cadete: [],
       Juvenil: [],
     };
     
+    // 2. Recorremos los jugadores recibidos de la API
     allPlayers.forEach(player => {
-      // La clave es asegurarse de que player.team existe y es uno de los equipos esperados
+      // 3. Si el jugador tiene un equipo y es uno de los que esperamos...
       if (player.team && groups[player.team]) {
+        // 4. ...lo añadimos a la lista de ese equipo.
         groups[player.team].push(player);
       }
     });
 
-    for (const team in groups) {
-      (groups as any)[team].sort((a: User, b: User) => (a.nombreCompleto || '').localeCompare(b.nombreCompleto || ''));
+    // 5. Opcional: Ordenamos alfabéticamente los jugadores dentro de cada equipo
+    for (const teamName in groups) {
+      (groups as any)[teamName].sort((a: User, b: User) => (a.nombreCompleto || '').localeCompare(b.nombreCompleto || ''));
     }
     
     return groups;
@@ -66,10 +73,15 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setViewingFeedbackForPlayer(null);
   };
 
+  // Si hemos seleccionado un jugador, mostramos su vista de detalle en lugar de la lista
   if (viewingFeedbackForPlayer) {
-    return <PlayerFeedbackDetailView player={viewingFeedbackForPlayer} onClose={handleCloseFeedbackView} />;
+    return <PlayerFeedbackDetailView 
+              player={viewingFeedbackForPlayer} 
+              onClose={handleCloseFeedbackView} 
+           />;
   }
 
+  // Si no, mostramos la lista principal de jugadores por equipo
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-95 text-white flex flex-col p-4 z-[150] overflow-hidden">
       <header className="flex items-center justify-between mb-6 pb-4 border-b border-gray-700 flex-shrink-0">
@@ -90,7 +102,7 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         ) : (
           <div className="space-y-4">
             {teamDisplayOrder.map(teamName => {
-              const playersInTeam = groupedPlayers[teamName] || [];
+              const playersInTeam = groupedPlayers[teamName];
               const colors = teamColors[teamName];
               return (
                 <section key={teamName} aria-labelledby={`team-header-${teamName}`}>

@@ -29,6 +29,7 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setError(null);
         try {
           const fetchedPlayers = await ApiService.getAllPlayers();
+          console.log("Jugadores recibidos del backend:", fetchedPlayers);
           setAllPlayers(fetchedPlayers);
         } catch (err) {
           console.error("Error fetching players:", err);

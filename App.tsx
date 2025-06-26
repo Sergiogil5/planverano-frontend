@@ -77,6 +77,67 @@ const AppContent: React.FC = () => {
     return () => clearTimeout(timer); 
   }, []);
 
+  useEffect(() => {
+    const loadUserData = async () => {
+      // Limpiamos todo al principio
+      setUserProgress({});
+      setPausedSessionDetails(null);
+
+      if (currentUser) {
+        // Obtenemos el token para hacer las llamadas a la API
+        const token = localStorage.getItem('jwt_token');
+        if (!token) return; // Si no hay token, no podemos hacer nada
+
+        try {
+          // --- 1. Cargar el PROGRESO GENERAL del usuario ---
+          const progressDataFromApi = await ApiService.fetchUserProgress();
+          const progressMap: Record<string, UserDayProgress> = {};
+          
+          progressDataFromApi.forEach((progreso: any) => {
+            const dayKey = `week${progreso.sesion.numeroSemana}-${progreso.sesion.titulo}`;
+            
+            progressMap[dayKey] = {
+              userId: currentUser.id,
+              dayKey: dayKey,
+              allExercisesCompleted: true, // Si hay un registro de progreso, es que se completó
+              completedAt: progreso.fechaCompletado,
+              // Por ahora, asumimos que los detalles vienen en el feedback, no aquí.
+              // Podríamos añadir más campos si el backend los devolviera.
+              completedExerciseIndices: [], 
+              exerciseActualDurations: progreso.tiemposJson ? JSON.parse(progreso.tiemposJson) : {},
+              exerciseRoutes: progreso.rutaGpsJson ? JSON.parse(progreso.rutaGpsJson) : {}
+            };
+          });
+          setUserProgress(progressMap);
+
+          // --- 2. Cargar la SESIÓN PAUSADA, si existe ---
+          const pausedDataFromApi = await ApiService.fetchPausedSession();
+          if (pausedDataFromApi) {
+            // Transformamos los datos del backend al formato que el estado del frontend espera
+            const pausedState: PausedSessionState = {
+              weekNumber: pausedDataFromApi.sesionDiaria.numeroSemana,
+              dayName: pausedDataFromApi.sesionDiaria.titulo,
+              exerciseIndex: pausedDataFromApi.ultimoEjercicioIndex,
+              phase: pausedDataFromApi.fase as ('EXERCISE' | 'REST'),
+              timeLeftInSeconds: pausedDataFromApi.tiempoRestanteSeg,
+              initialDurationInSeconds: pausedDataFromApi.duracionInicialSeg,
+            };
+            setPausedSessionDetails(pausedState);
+          }
+
+        } catch (error) {
+          console.error("Error al cargar los datos del usuario desde el backend:", error);
+          // Si hay un error, nos aseguramos de que todo esté limpio
+          setUserProgress({});
+          setPausedSessionDetails(null);
+        }
+      }
+    };
+
+    loadUserData();
+    // Este efecto se ejecuta cada vez que 'currentUser' cambia (login/logout)
+  }, [currentUser]);
+
     // --- ¡NUEVO EFECTO PARA CARGAR DATOS DE LA SEMANA! ---
   useEffect(() => {
     // Solo intentamos cargar datos si hay un usuario logueado.
@@ -157,21 +218,10 @@ const AppContent: React.FC = () => {
     }
   }, [currentUser]);
 
-  useEffect(() => {
-    const fetchProgress = async () => {
-      if (currentUser) {
-        const progress = await ApiService.getUserProgress(currentUser.id);
-        setUserProgress(progress);
-      } else {
-        setUserProgress({}); 
-      }
-    };
-    fetchProgress();
-  }, [currentUser]);
 
   const saveProgressToApi = useCallback(async (dayKey: string, progressEntry: UserDayProgress) => {
     if (currentUser) {
-      await ApiService.saveUserProgress(currentUser.id, dayKey, progressEntry);
+      console.log("Guardado de progreso parcial localmente:", progressEntry); 
     }
   }, [currentUser]);
 
@@ -432,7 +482,9 @@ const AppContent: React.FC = () => {
       };
 
       setUserProgress(prev => ({ ...prev, [dayKey]: updatedDayProgress }));
-      await ApiService.recordActivityLibre(currentUser.id, currentWeekData.weekNumber, day.dayName, details, completedTimestamp);
+        
+        // La llamada a ApiService.recordActivityLibre se elimina.
+        // El guardado real ocurrirá cuando se envíe el feedback.
       
       setActivityLibreModalInfo(null); 
 

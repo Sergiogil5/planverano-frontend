@@ -426,8 +426,7 @@ const AppContent: React.FC = () => {
         const feedbackPayload = {
             sesionId: feedbackContext.day.id, // <-- ¡ASEGÚRATE DE QUE ESTA LÍNEA EXISTE!
             userId: currentUser.id,
-            userFirstName: currentUser.firstName,
-            userLastName: currentUser.lastName,
+            userNombreCompleto: currentUser.nombreCompleto, // <-- CORREGIDO
             weekNumber: feedbackContext.week.weekNumber,
             dayName: feedbackContext.day.dayName,
             feedbackEmoji: feedback.emoji,
@@ -631,7 +630,7 @@ const AppContent: React.FC = () => {
   }
   
 // LÍNEA CORREGIDA
-const userTitle = `${currentUser.nombreCompleto || (currentUser.firstName + ' ' + currentUser.lastName)} (${currentUser.rol === 'ENTRENADOR' ? 'Admin' : currentUser.team})`;
+const userTitle = `${currentUser.nombreCompleto} (${currentUser.rol === 'ENTRENADOR' ? 'Admin' : currentUser.team})`;
 console.log("Usuario actual:", currentUser); // <--- AÑADE ESTA LÍNEA
 
   return (
@@ -647,7 +646,7 @@ console.log("Usuario actual:", currentUser); // <--- AÑADE ESTA LÍNEA
                 <div 
                   className="rounded-full w-10 h-10 flex items-center justify-center mr-3 shrink-0 overflow-hidden" 
                   title={userTitle}
-                  aria-label={`Avatar de ${currentUser.firstName}`}
+                  aria-label={`Avatar de ${currentUser.nombreCompleto}`}
                 >
                   <img src={NEW_LOGO_URL} alt="Logo del Club" className="w-full h-full object-contain scale-125" />
                 </div>

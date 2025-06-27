@@ -40,30 +40,36 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   }, [viewingFeedbackForPlayer]);
 
   // useMemo para agrupar los jugadores por equipo cada vez que la lista 'allPlayers' cambia
-  const groupedPlayers = useMemo(() => {
-    // 1. Inicializamos un objeto con un array vacío para cada equipo
+    const groupedPlayers = useMemo(() => {
     const groups: Record<PlayerTeam, User[]> = {
       Infantil: [],
       Cadete: [],
       Juvenil: [],
     };
     
-    // 2. Recorremos los jugadores recibidos de la API
+    console.log("--- Agrupando jugadores ---");
     allPlayers.forEach(player => {
-      // 3. Si el jugador tiene un equipo y es uno de los que esperamos...
+      // --- ¡LÍNEA DE DEPURACIÓN CLAVE! ---
+      console.log(`Jugador: ${player.nombreCompleto}, Equipo recibido: '${player.team}', Tipo: ${typeof player.team}`);
+      
       if (player.team && groups[player.team]) {
-        // 4. ...lo añadimos a la lista de ese equipo.
+        console.log(`✔ Coincidencia encontrada. Añadiendo a ${player.team}`);
         groups[player.team].push(player);
+      } else {
+        console.log(`❌ Sin coincidencia para el equipo: '${player.team}'`);
       }
     });
-
+    console.log("--- Fin de la agrupación ---");
+    
     // 5. Opcional: Ordenamos alfabéticamente los jugadores dentro de cada equipo
     for (const teamName in groups) {
       (groups as any)[teamName].sort((a: User, b: User) => (a.nombreCompleto || '').localeCompare(b.nombreCompleto || ''));
     }
-    
+
     return groups;
   }, [allPlayers]);
+
+  
   
   const handlePlayerSelect = (player: User) => {
     setViewingFeedbackForPlayer(player);

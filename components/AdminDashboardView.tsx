@@ -50,11 +50,11 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     console.log("--- Agrupando jugadores ---");
     allPlayers.forEach(player => {
       // 3. Hacemos una comprobación simple y directa
-      if (player.team === 'Infantil') {
+      if (player.team?.toUpperCase() === 'Infantil') {
         groups.Infantil.push(player);
-      } else if (player.team === 'Cadete') {
+      } else if (player.team?.toUpperCase() === 'Cadete') {
         groups.Cadete.push(player);
-      } else if (player.team === 'Juvenil') {
+      } else if (player.team?.toUpperCase() === 'Juvenil') {
         groups.Juvenil.push(player);
       }
     });

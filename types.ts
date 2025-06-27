@@ -167,3 +167,5 @@ export interface ApiResponse_TrainingWeek {
   title: string;
   days: ApiTrainingDay[];
 }
+
+// me encanta la programación ...

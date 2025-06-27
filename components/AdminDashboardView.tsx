@@ -6,11 +6,11 @@ import PlayerFeedbackDetailView from './PlayerFeedbackDetailView';
 
 // La configuración de colores y orden no cambia
 const teamColors: Record<PlayerTeam, { bg: string; text: string; headerBg: string; headerText: string }> = {
-  Infantil: { bg: 'bg-sky-600', text: 'text-white', headerBg: 'bg-sky-700', headerText: 'text-sky-100' },
-  Cadete: { bg: 'bg-emerald-600', text: 'text-white', headerBg: 'bg-emerald-700', headerText: 'text-emerald-100' },
-  Juvenil: { bg: 'bg-indigo-600', text: 'text-white', headerBg: 'bg-indigo-700', headerText: 'text-indigo-100' },
+  INFANTIL: { bg: 'bg-sky-600', text: 'text-white', headerBg: 'bg-sky-700', headerText: 'text-sky-100' },
+  CADETE: { bg: 'bg-emerald-600', text: 'text-white', headerBg: 'bg-emerald-700', headerText: 'text-emerald-100' },
+  JUVENIL: { bg: 'bg-indigo-600', text: 'text-white', headerBg: 'bg-indigo-700', headerText: 'text-indigo-100' },
 };
-const teamDisplayOrder: PlayerTeam[] = ['Infantil', 'Cadete', 'Juvenil'];
+const teamDisplayOrder: PlayerTeam[] = ['INFANTIL', 'CADETE', 'JUVENIL'];
 
 const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [allPlayers, setAllPlayers] = useState<User[]>([]);
@@ -41,21 +41,17 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   // useMemo para agrupar los jugadores por equipo cada vez que la lista 'allPlayers' cambia
   const groupedPlayers = useMemo(() => {
-    const groups:  { Infantil: User[], Cadete: User[], Juvenil: User[] } = {
-      Infantil: [],
-      Cadete: [],
-      Juvenil: [],
+    const groups:  { INFANTIL: User[], CADETE: User[], JUVENIL: User[] } = {
+      INFANTIL: [],
+      CADETE: [],
+      JUVENIL: [],
     };
     
     console.log("--- Agrupando jugadores ---");
     allPlayers.forEach(player => {
       // 3. Hacemos una comprobación simple y directa
-      if (player.team?.toUpperCase() === 'Infantil') {
-        groups.Infantil.push(player);
-      } else if (player.team?.toUpperCase() === 'Cadete') {
-        groups.Cadete.push(player);
-      } else if (player.team?.toUpperCase() === 'Juvenil') {
-        groups.Juvenil.push(player);
+      if (player.team && groups[player.team]) {
+      groups[player.team].push(player);
       }
     });
     console.log("--- Fin de la agrupación ---");
@@ -112,7 +108,7 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
               return (
                 <section key={teamName} aria-labelledby={`team-header-${teamName}`}>
                   <h3 id={`team-header-${teamName}`} className={`p-2.5 rounded-t-md text-md font-semibold ${colors.headerBg} ${colors.headerText} sticky top-0 z-10`}>
-                    {teamName} ({playersInTeam.length})
+                    {teamName.charAt(0) + teamName.slice(1).toLowerCase()} ({playersInTeam.length})
                   </h3>
                   <div className="bg-gray-750 p-2 rounded-b-md">
                     {playersInTeam.length === 0 ? (

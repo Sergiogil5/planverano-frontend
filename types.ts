@@ -64,7 +64,7 @@ export interface GuidedSessionViewProps {
 
 // --- Authentication Types ---
 export type UserRole = 'ENTRENADOR' | 'JUGADOR';
-export type PlayerTeam = 'Infantil' | 'Cadete' | 'Juvenil';
+export type PlayerTeam = 'INFANTIL' | 'CADETE' | 'JUVENIL';
 
 export interface User {
   nombreCompleto: string;

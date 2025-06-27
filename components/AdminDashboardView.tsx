@@ -40,8 +40,8 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   }, [viewingFeedbackForPlayer]);
 
   // useMemo para agrupar los jugadores por equipo cada vez que la lista 'allPlayers' cambia
-    const groupedPlayers = useMemo(() => {
-    const groups: Record<PlayerTeam, User[]> = {
+  const groupedPlayers = useMemo(() => {
+    const groups:  { Infantil: User[], Cadete: User[], Juvenil: User[] } = {
       Infantil: [],
       Cadete: [],
       Juvenil: [],
@@ -49,14 +49,13 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     
     console.log("--- Agrupando jugadores ---");
     allPlayers.forEach(player => {
-      // --- ¡LÍNEA DE DEPURACIÓN CLAVE! ---
-      console.log(`Jugador: ${player.nombreCompleto}, Equipo recibido: '${player.team}', Tipo: ${typeof player.team}`);
-      
-      if (player.team && groups[player.team]) {
-        console.log(`✔ Coincidencia encontrada. Añadiendo a ${player.team}`);
-        groups[player.team].push(player);
-      } else {
-        console.log(`❌ Sin coincidencia para el equipo: '${player.team}'`);
+      // 3. Hacemos una comprobación simple y directa
+      if (player.team === 'Infantil') {
+        groups.Infantil.push(player);
+      } else if (player.team === 'Cadete') {
+        groups.Cadete.push(player);
+      } else if (player.team === 'Juvenil') {
+        groups.Juvenil.push(player);
       }
     });
     console.log("--- Fin de la agrupación ---");

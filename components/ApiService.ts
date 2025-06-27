@@ -1,4 +1,4 @@
-import { User, UserRole, SessionFeedbackData, PausedSessionState, PlayerTeam, PlayerFeedbackDisplay, ActivityLibreDetails, TrainingDay } from '../types';
+import { User, UserRole, TrainingWeek, ApiTrainingDay, ApiResponse_TrainingWeek } from '../types';
 
 const API_BASE_URL = 'https://planverano-backend.onrender.com';
 
@@ -70,7 +70,7 @@ const ApiService = {
     },
     
     // --- Entrenamientos y Progreso ---
-    getWeekData: async (weekNumber: number): Promise<TrainingWeek> => {
+    getWeekData: async (weekNumber: number): Promise<ApiResponse_TrainingWeek> => {
         const response = await fetch(`${API_BASE_URL}/api/training/semana/${weekNumber}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('No se pudieron cargar los datos de la semana.');
         return response.json();

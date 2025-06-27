@@ -129,3 +129,41 @@ export interface SessionFeedbackData {
 export interface PlayerFeedbackDisplay extends SessionFeedbackData {
   id: string; // Unique ID for the feedback entry itself
 }
+
+// --- ¡NUEVOS TIPOS PARA LOS DATOS DE LA API! ---
+
+// Representa un PasoEjercicio que viene del backend
+export interface ApiPaso {
+  id: number;
+  orden: number;
+  nombreEjercicio: string;
+  tipoMedida: 'TIEMPO_MINUTOS' | 'TIEMPO_SEGUNDOS' | 'REPETICIONES';
+  cantidad: number;
+  descansoDespuesSeg: number;
+  gifUrl: string | null;
+}
+
+// Representa un BloqueEjercicio que viene del backend
+export interface ApiBloque {
+  id: number;
+  orden: number;
+  repeticionesBloque: number;
+  pasos: ApiPaso[];
+}
+
+// Representa una SesionDiaria que viene del backend
+export interface ApiTrainingDay {
+  id: number;
+  numeroSemana: number;
+  numeroDia: number;
+  tipoSesion: 'ENTRENAMIENTO_GUIADO' | 'ACTIVIDAD_LIBRE' | 'DESCANSO_ACTIVO';
+  titulo: string;
+  descripcion: string | null;
+  bloques: ApiBloque[] | null;
+}
+
+export interface ApiResponse_TrainingWeek {
+  weekNumber: number;
+  title: string;
+  days: ApiTrainingDay[];
+}

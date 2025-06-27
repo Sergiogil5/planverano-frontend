@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { TRAINING_DATA } from './constants';
-import { TrainingWeek, TrainingDay, PausedSessionState, User, SessionFeedbackData, UserDayProgress, ActivityLibreDetails, ExercisePerformanceData, ExerciseRoutesData } from './types';
+import { ApiTrainingDay, ApiResponse_TrainingWeek, ApiBloque, ApiPaso, TrainingWeek, TrainingDay, PausedSessionState, User, SessionFeedbackData, UserDayProgress, ActivityLibreDetails, ExercisePerformanceData, ExerciseRoutesData } from './types';
 import WeekSelector from './components/WeekSelector';
 import WeekView from './components/WeekView';
 import LinkIcon from './components/icons/LinkIcon';
@@ -95,7 +95,7 @@ const AppContent: React.FC = () => {
           
           progressDataFromApi.forEach((progreso: any) => {
             const dayKey = `week${progreso.sesion.numeroSemana}-${progreso.sesion.titulo}`;
-            
+            if (!currentUser) return; // Si no hay usuario, no hacemos nada
             progressMap[dayKey] = {
               userId: currentUser.id,
               dayKey: dayKey,
@@ -144,11 +144,40 @@ const AppContent: React.FC = () => {
     const fetchWeekData = async () => {
       setIsLoadingWeek(true);
       try {
-        // getWeekData ahora devuelve un objeto TrainingWeek completo
-        const weekDataFromApi: TrainingWeek = await ApiService.getWeekData(currentWeekNumber);
-        setWeekData(weekDataFromApi);
+        // 1. Pedimos el objeto completo a la API
+        const apiResponse: ApiResponse_TrainingWeek = await ApiService.getWeekData(currentWeekNumber);
+
+        // 2. TRADUCCIÓN de la estructura de la API a la estructura del frontend
+        const daysParaFrontend: TrainingDay[] = apiResponse.days.map((dayFromApi: ApiTrainingDay) => {
+          
+          const aplanados = (dayFromApi.bloques || []).flatMap(bloque => {
+            const pasosDelBloque = bloque.pasos.map(paso => ({
+              name: paso.nombreEjercicio,
+              repetitions: `${paso.cantidad} ${paso.tipoMedida.includes('MINUTOS') ? 'min' : paso.tipoMedida.includes('SEGUNDOS') ? 'seg' : ''}`.trim(),
+              rest: `${paso.descansoDespuesSeg} seg`,
+              gifUrl: paso.gifUrl || undefined,
+            }));
+            return Array.from({ length: bloque.repeticionesBloque }, () => pasosDelBloque).flat();
+          });
+          
+          // Creamos el objeto TrainingDay que el frontend espera
+          return {
+            id: dayFromApi.id,
+            dayName: dayFromApi.titulo,
+            notes: dayFromApi.descripcion || undefined,
+            exercises: aplanados,
+          };
+        });
+
+        // 3. Guardamos en el estado el objeto TrainingWeek completo y bien formado
+        setWeekData({
+          weekNumber: apiResponse.weekNumber,
+          title: apiResponse.title,
+          days: daysParaFrontend,
+        });
+
       } catch (error) {
-        console.error(`Error fetching data for week ${currentWeekNumber}:`, error);
+        console.error("Error fetching or processing week data:", error);
         setWeekData(null);
       } finally {
         setIsLoadingWeek(false);
@@ -181,11 +210,11 @@ const AppContent: React.FC = () => {
     if (currentUser) {
       console.log("Guardado de progreso parcial localmente:", progressEntry); 
     }
-  }, [currentUser]);
+    }, [currentUser]);
 
-  const handleWeekChange = (weekNumber: number) => {
+    const handleWeekChange = (weekNumber: number) => {
     setCurrentWeekNumber(weekNumber);
-  };
+    };
 
   useEffect(() => {
     if (!guidedSessionDay && !showResumeDialogForDay && !showPostSessionFeedback && currentUser && !showAdminDashboard && !activityLibreModalInfo) {

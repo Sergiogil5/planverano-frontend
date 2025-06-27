@@ -70,7 +70,7 @@ const ApiService = {
     },
     
     // --- Entrenamientos y Progreso ---
-    getWeekData: async (weekNumber: number): Promise<TrainingDay[]> => {
+    getWeekData: async (weekNumber: number): Promise<TrainingWeek> => {
         const response = await fetch(`${API_BASE_URL}/api/training/semana/${weekNumber}`, { headers: getAuthHeaders() });
         if (!response.ok) throw new Error('No se pudieron cargar los datos de la semana.');
         return response.json();

@@ -140,45 +140,22 @@ const AppContent: React.FC = () => {
 
     // --- ¡NUEVO EFECTO PARA CARGAR DATOS DE LA SEMANA! ---
   useEffect(() => {
-    // Solo intentamos cargar datos si hay un usuario logueado.
-      if (currentUser) {
+    if (!currentUser) return;
     const fetchWeekData = async () => {
       setIsLoadingWeek(true);
       try {
-        const sesionesDelBackend: any[] = await ApiService.getWeekData(currentWeekNumber);
-        const infoSemanaLocal = TRAINING_DATA.weeks.find(w => w.weekNumber === currentWeekNumber);
-
-        const datosParaFrontend: TrainingWeek = {
-          weekNumber: currentWeekNumber,
-          title: infoSemanaLocal?.title || `Semana ${currentWeekNumber}`,
-          days: sesionesDelBackend.map(sesion => ({
-            id: sesion.id,
-            dayName: sesion.titulo,
-            notes: sesion.descripcion,
-            exercises: (sesion.bloques || []).flatMap((bloque: any) => 
-              Array(bloque.repeticionesBloque).fill(bloque.pasos).flat()
-            ).map((paso: any) => {
-              let reps = String(paso.cantidad);
-              if (paso.tipoMedida === 'TIEMPO_MINUTOS') reps += ' min';
-              else if (paso.tipoMedida === 'TIEMPO_SEGUNDOS') reps += ' seg';
-              return { name: paso.nombreEjercicio, repetitions: reps, rest: `${paso.descansoDespuesSeg} seg`, gifUrl: paso.gifUrl };
-            })
-          }))
-        };
-          
-          setWeekData(datosParaFrontend);
-
-        } catch (error) {
-          console.error("Error fetching week data:", error);
-          setWeekData(null); // En caso de error, no mostramos nada.
-        } finally {
-          setIsLoadingWeek(false); // Quitamos la pantalla de "Cargando..."
-        }
-      };
-
-      fetchWeekData();
-    }
-  }, [currentUser, currentWeekNumber]); // Este efecto se ejecuta cuando el usuario se loguea o cuando cambia el `currentWeekNumber`.
+        // getWeekData ahora devuelve un objeto TrainingWeek completo
+        const weekDataFromApi: TrainingWeek = await ApiService.getWeekData(currentWeekNumber);
+        setWeekData(weekDataFromApi);
+      } catch (error) {
+        console.error(`Error fetching data for week ${currentWeekNumber}:`, error);
+        setWeekData(null);
+      } finally {
+        setIsLoadingWeek(false);
+      }
+    };
+    fetchWeekData();
+  }, [currentUser, currentWeekNumber]);
 
   useEffect(() => {
     const lastSloganLetterIndividualAnimationStartDelay =
@@ -289,7 +266,7 @@ const AppContent: React.FC = () => {
     setShowResumeDialogForDay(null);
   };
 
-    const handleEndGuidedSession = (
+  const handleEndGuidedSession = (
     reason?: 'completed' | 'closed_manually', 
     completedIndicesInRun?: number[],
     exerciseActualDurations?: ExercisePerformanceData,
@@ -407,13 +384,12 @@ const AppContent: React.FC = () => {
     if (feedback && currentUser && feedbackContext) { 
       
       // --- ¡LÓGICA DE BÚSQUEDA CORREGIDA! ---
-      // Buscamos el objeto del día DENTRO de la información de la semana que está en el contexto.
-      // Ya no necesitamos buscar en la constante global TRAINING_DATA.
-      const dayObject = feedbackContext.week.days.find((d: TrainingDay) => d.dayName === feedbackContext.day.dayName);
+      
+      const sesionIdParaEnviar = feedbackContext.day.id; // <-- El ID ahora viene del estado 'weekData' que se cargó de la API
 
       // La comprobación de seguridad sigue siendo importante
-      if (!dayObject || dayObject.id === undefined) {
-        console.error("Error crítico: No se pudo encontrar el ID de la sesión en el contexto para enviar el feedback.");
+      if (sesionIdParaEnviar === undefined) {
+      console.error("Error crítico: No se pudo encontrar el ID de la sesión en el contexto para enviar el feedback.");
         setShowPostSessionFeedback(false);
         setFeedbackContext(null);
         document.body.style.overflow = '';
@@ -422,7 +398,7 @@ const AppContent: React.FC = () => {
       
       // El payload ahora usa el 'dayObject.id' que hemos encontrado
       const feedbackPayload = {
-        sesionId: dayObject.id,
+        sesionId: sesionIdParaEnviar,
         feedbackEmoji: feedback.emoji,
         feedbackLabel: feedback.label,
         feedbackTextoOpcional: "", // Puedes añadir este campo más adelante
@@ -432,7 +408,7 @@ const AppContent: React.FC = () => {
 
       // La llamada a la API y la lógica de notificación no cambian
       try {
-        await ApiService.submitSessionFeedback(feedbackPayload);
+        await ApiService.submitSessionFeedback(feedbackPayload); // Renombrado en mi sugerencia anterior, si no, usa tu nombre
         console.log("Feedback enviado con éxito al backend real.");
         if (currentUser.rol !== 'ENTRENADOR') { 
             // Podríamos implementar una notificación real aquí en el futuro

@@ -68,7 +68,7 @@ export type PlayerTeam = 'Infantil' | 'Cadete' | 'Juvenil';
 
 export interface User {
   nombreCompleto: string;
-  id: string;
+  id: number; // El backend devuelve un número (Long)
   email: string;
   rol: UserRole;
   team?: PlayerTeam; // Only for players
@@ -101,7 +101,7 @@ export interface ActivityLibreDetails {
 }
 
 export interface UserDayProgress {
-  userId: string; 
+  userId: number; 
   dayKey: string; // "week<N>-day<DayName>" e.g., "week1-Día 1"
   completedExerciseIndices: number[]; // For structured days
   allExercisesCompleted: boolean;

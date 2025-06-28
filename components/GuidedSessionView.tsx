@@ -477,46 +477,49 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
     );
   }
   
-    const handleNextClick = () => {
-    // 1. Detenemos cualquier actividad en curso (voz, timer, GPS)
+      // En GuidedSessionView.tsx
+
+  const handleNextClick = () => {
+    // 1. Detenemos cualquier actividad visual o sonora
     setTimerIsActive(false); 
     window.speechSynthesis.cancel();
     stopLocationTracking(currentExerciseInternalIndex);
 
-    // --- ¡AQUÍ ESTÁ LA CORRECCIÓN MÁS IMPORTANTE! ---
-    // 2. Comprobamos si el paso que acaba de terminar era un EJERCICIO
+    // 2. --- ¡LÓGICA DE GUARDADO DE TIEMPO CORREGIDA! ---
+    // Solo actuamos si el paso que termina es un EJERCICIO
     if (sessionPhase === 'EXERCISE') {
-      let timeSpentInSeconds = 0;
+      const exercise = exercises[currentExerciseInternalIndex];
+      const initialDuration = parseTimeToSeconds(exercise.repetitions);
+      let timeSpent = 0;
 
-      // 2a. Si tenía un 'startTime' (era por repeticiones), calculamos el tiempo real
-      if (currentExerciseStartTimeRef.current) {
-        timeSpentInSeconds = (Date.now() - currentExerciseStartTimeRef.current) / 1000;
+      // 2a. Si el ejercicio era por REPETICIONES (tenía un 'startTime' guardado)
+      if (initialDuration === 0 && currentExerciseStartTimeRef.current) {
+        timeSpent = (Date.now() - currentExerciseStartTimeRef.current) / 1000;
       } 
-      // 2b. Si NO tenía 'startTime' (era por tiempo), calculamos el tiempo real que ha pasado
-      else {
-        timeSpentInSeconds = initialDurationInSeconds - timeLeftInSeconds;
+      // 2b. Si el ejercicio era por TIEMPO (no tenía 'startTime')
+      else if (initialDuration > 0) {
+        // Guardamos el tiempo que realmente ha pasado, no el total
+        timeSpent = initialDuration - timeLeftInSeconds;
       }
-      
-      // 2c. Guardamos el tiempo calculado en nuestro registro
-      exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpentInSeconds;
-    }
-    // --- FIN DE LA CORRECCIÓN ---
 
-    // 3. Vaciamos el bolsillo del cronómetro fantasma para el siguiente paso
+      // 2c. Guardamos el tiempo en nuestro registro, sea cual sea el caso
+      exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpent;
+    }
+    // --- FIN DE LA LÓGICA DE GUARDADO ---
+
+    // 3. Limpiamos el 'startTime' para el siguiente paso
     currentExerciseStartTimeRef.current = null;
     
-    // 4. Lógica para avanzar al siguiente paso (esta ya la tenías y estaba bien)
+    // 4. Lógica para avanzar al siguiente paso (esta parte ya estaba bien)
     const isLastExercise = currentExerciseInternalIndex >= totalExercises - 1;
     const currentEx = exercises[currentExerciseInternalIndex];
     const restDuration = parseTimeToSeconds(currentEx.rest);
 
     if (sessionPhase === 'EXERCISE' && restDuration > 0) {
-      // Si hay descanso, pasamos a la fase de descanso
       initializeRestState(currentExerciseInternalIndex);
     } else {
-      // Si no hay descanso o veníamos de un descanso, pasamos al siguiente ejercicio
       if (isLastExercise) {
-        onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
+        onClose('completed', [], { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
       } else {
         initializeExerciseState(currentExerciseInternalIndex + 1);
       }

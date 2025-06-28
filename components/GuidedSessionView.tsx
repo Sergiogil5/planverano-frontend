@@ -124,6 +124,27 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
   const exercises = day.exercises;
   const totalExercises = exercises.length;
 
+  const commitCurrentExerciseTime = () => {
+    if (sessionPhase === 'EXERCISE') {
+      let timeSpent = 0;
+      const exercise = exercises[currentExerciseInternalIndex];
+      const initialDuration = parseTimeToSeconds(exercise.repetitions);
+
+      if (initialDuration === 0 && currentExerciseStartTimeRef.current) {
+        // Caso Cronómetro Fantasma (Repeticiones)
+        timeSpent = (Date.now() - currentExerciseStartTimeRef.current) / 1000;
+      } else if (initialDuration > 0) {
+        // Caso Cuenta Atrás (Tiempo)
+        timeSpent = initialDuration - timeLeftInSeconds;
+      }
+      
+      // Solo guardamos si el tiempo es significativo
+      if (timeSpent > 0.1) { // Usamos 0.1 para evitar tiempos residuales
+        exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpent;
+      }
+    }
+  };
+
   const stopLocationTracking = useCallback((exerciseIndexToStore: number) => {
     if (locationWatchIdRef.current !== null) {
       navigator.geolocation.clearWatch(locationWatchIdRef.current);
@@ -312,60 +333,40 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
   }, [initialState, exercises]); // Keep `exercises` if it can change, or `day.id` if day can change
 
 
-  useEffect(() => {
-    let intervalId: number | null = null;
-    if (timerIsActive && timeLeftInSeconds > 0) { 
-      intervalId = window.setInterval(() => {
-        setTimeLeftInSeconds(prev => {
-          const newTimeLeft = prev - 1;
-          const currentEx = exercises[currentExerciseInternalIndex];
+useEffect(() => {
+  let intervalId: number | null = null;
+  if (timerIsActive && timeLeftInSeconds > 0) {
+    intervalId = window.setInterval(() => {
+      setTimeLeftInSeconds(prev => prev - 1);
+    }, 1000);
+  } else if (timerIsActive && timeLeftInSeconds === 0) {
+    setTimerIsActive(false);
+    
+    // ¡Llamamos aquí también!
+    commitCurrentExerciseTime(); 
 
-          if (currentEx) {
-            const currentExNameLower = currentEx.name.toLowerCase();
-            if (sessionPhase === 'EXERCISE' && parseTimeToSeconds(currentEx.repetitions) > 0) {
-                if (currentExNameLower === 'carrera continua' || currentExNameLower === 'saltos a la comba' || currentExNameLower === 'carrera suave') {
-                    if (newTimeLeft === 60) speak("Quedan 60 segundos", true);
-                    else if (newTimeLeft === 30) speak("30 segundos, ya queda poco", true);
-                    else if (newTimeLeft === 10) speak("10 segundos, ya terminamos. ¡Ánimo!", true);
-                }
-            } else if (sessionPhase === 'REST' && parseTimeToSeconds(currentEx.rest) > 0) { 
-              if (newTimeLeft >= 1 && newTimeLeft <= 10) {
-                speak(String(newTimeLeft), newTimeLeft === 10); 
-              }
-            }
-          }
-          return newTimeLeft;
-        });
-      }, 1000);
-    } else if (timerIsActive && timeLeftInSeconds === 0) { 
-      setTimerIsActive(false); 
-      
-      recordCurrentExerciseTime(); 
-      commitAccumulatedTimeToPerformanceData(); 
-      if (sessionPhase === 'EXERCISE') stopLocationTracking(currentExerciseInternalIndex);
-
-      if (sessionPhase === 'EXERCISE') {
-        markCurrentExerciseAsCompletedInRun();
-        const restStarted = initializeRestState(currentExerciseInternalIndex);
-        if (!restStarted) {
-          if (currentExerciseInternalIndex < totalExercises - 1) {
-            initializeExerciseState(currentExerciseInternalIndex + 1);
-          } else {
-            onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current }); 
-          }
-        }
-      } else { 
+    // Lógica de avance
+    if (sessionPhase === 'EXERCISE') {
+      markCurrentExerciseAsCompletedInRun();
+      const restStarted = initializeRestState(currentExerciseInternalIndex);
+      if (!restStarted) {
         if (currentExerciseInternalIndex < totalExercises - 1) {
           initializeExerciseState(currentExerciseInternalIndex + 1);
         } else {
-          onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current }); 
+          onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
         }
       }
+    } else {
+      if (currentExerciseInternalIndex < totalExercises - 1) {
+        initializeExerciseState(currentExerciseInternalIndex + 1);
+      } else {
+        onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
+      }
     }
-    return () => {
-      if (intervalId) window.clearInterval(intervalId);
+  }
+  return () => { if (intervalId) clearInterval(intervalId);
     };
-  }, [timerIsActive, timeLeftInSeconds, sessionPhase, currentExerciseInternalIndex, totalExercises, initializeExerciseState, initializeRestState, onClose, exercises, markCurrentExerciseAsCompletedInRun, recordCurrentExerciseTime, commitAccumulatedTimeToPerformanceData, stopLocationTracking]);
+  }, [timerIsActive, timeLeftInSeconds, sessionPhase, commitCurrentExerciseTime, currentExerciseInternalIndex, totalExercises, initializeExerciseState, initializeRestState, onClose, exercises, markCurrentExerciseAsCompletedInRun, recordCurrentExerciseTime, commitAccumulatedTimeToPerformanceData, stopLocationTracking]);
 
   // This useEffect is for announcing the current exercise/rest phase details.
   useEffect(() => {
@@ -480,36 +481,14 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
       // En GuidedSessionView.tsx
 
   const handleNextClick = () => {
+    // 1. Guardamos el tiempo del paso que acaba de terminar
+    commitCurrentExerciseTime();
     // 1. Detenemos cualquier actividad visual o sonora
     setTimerIsActive(false); 
     window.speechSynthesis.cancel();
     stopLocationTracking(currentExerciseInternalIndex);
-
-    // 2. --- ¡LÓGICA DE GUARDADO DE TIEMPO CORREGIDA! ---
-    // Solo actuamos si el paso que termina es un EJERCICIO
-    if (sessionPhase === 'EXERCISE') {
-      const exercise = exercises[currentExerciseInternalIndex];
-      const initialDuration = parseTimeToSeconds(exercise.repetitions);
-      let timeSpent = 0;
-
-      // 2a. Si el ejercicio era por REPETICIONES (tenía un 'startTime' guardado)
-      if (initialDuration === 0 && currentExerciseStartTimeRef.current) {
-        timeSpent = (Date.now() - currentExerciseStartTimeRef.current) / 1000;
-      } 
-      // 2b. Si el ejercicio era por TIEMPO (no tenía 'startTime')
-      else if (initialDuration > 0) {
-        // Guardamos el tiempo que realmente ha pasado, no el total
-        timeSpent = initialDuration - timeLeftInSeconds;
-      }
-
-      // 2c. Guardamos el tiempo en nuestro registro, sea cual sea el caso
-      exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpent;
-    }
-    // --- FIN DE LA LÓGICA DE GUARDADO ---
-
-    // 3. Limpiamos el 'startTime' para el siguiente paso
     currentExerciseStartTimeRef.current = null;
-    
+  
     // 4. Lógica para avanzar al siguiente paso (esta parte ya estaba bien)
     const isLastExercise = currentExerciseInternalIndex >= totalExercises - 1;
     const currentEx = exercises[currentExerciseInternalIndex];
@@ -599,13 +578,17 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
     setTimerIsActive(false);
     recordCurrentExerciseTime();
     commitAccumulatedTimeToPerformanceData();
+    commitCurrentExerciseTime();
     stopLocationTracking(currentExerciseInternalIndex); 
     onPauseAndExit({
       exerciseIndex: currentExerciseInternalIndex,
       phase: sessionPhase,
       timeLeftInSeconds: timeLeftInSeconds,
       initialDurationInSeconds: initialDurationInSeconds,
-    }, Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
+    }, Array.from(completedIndicesInRunRef.current),
+      { ...exerciseActualDurationsRef.current }, // ¡Ahora contiene el último tiempo!
+      { ...allCollectedRoutesRef.current }
+    );
   };
 
   const handleOpenCloseConfirmModal = () => {

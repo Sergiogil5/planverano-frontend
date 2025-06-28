@@ -248,11 +248,24 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
     
     if (resumePhase === 'EXERCISE' && typeof resumeTimeLeft === 'number' && typeof resumeInitialDuration === 'number') {
       applyState(exerciseIdx, 'EXERCISE', resumeTimeLeft, resumeInitialDuration, true);
-    } else {
+      return; // Salimos para no ejecutar la lógica de abajo
+    }
       const exercise = exercises[exerciseIdx];
       const duration = parseTimeToSeconds(exercise.repetitions); 
-      applyState(exerciseIdx, 'EXERCISE', duration, duration, true); 
-    }
+      if (duration > 0) {
+            // CASO A: El ejercicio es POR TIEMPO
+            // Apagamos el cronómetro fantasma
+            currentExerciseStartTimeRef.current = null;
+            // Llamamos a applyState para que configure la cuenta atrás
+            applyState(exerciseIdx, 'EXERCISE', duration, duration, true);
+          } else {
+            // CASO B: El ejercicio es POR REPETICIONES
+            // No hay cuenta atrás, pero...
+            // ¡Activamos el cronómetro fantasma guardando la hora de inicio!
+            currentExerciseStartTimeRef.current = Date.now();
+            // Llamamos a applyState para que configure un ejercicio sin tiempo
+            applyState(exerciseIdx, 'EXERCISE', 0, 0, false);     
+          }
   }, [exercises, applyState]);
 
   const initializeRestState = useCallback((exerciseIdxForPreceding: number, resumeTimeLeft?: number, resumeInitialDuration?: number, resumePhase?: 'EXERCISE' | 'REST') => {
@@ -465,12 +478,26 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
   }
   
   const handleNextClick = () => {
-    setTimerIsActive(false); 
+    // Detenemos la voz y cualquier timer visible que pudiera estar corriendo
     window.speechSynthesis.cancel();
-    recordCurrentExerciseTime(); 
-    commitAccumulatedTimeToPerformanceData(); 
-    if(sessionPhase === 'EXERCISE') stopLocationTracking(currentExerciseInternalIndex);
+    setTimerIsActive(false); 
+    stopLocationTracking(currentExerciseInternalIndex);
+    // --- ¡AÑADE ESTE BLOQUE AL PRINCIPIO! ---
+    // Primero, comprobamos si nuestro bolsillo secreto tiene algo.
+    if (sessionPhase === 'EXERCISE' && currentExerciseStartTimeRef.current) {
+      // Si lo tiene, significa que venimos de un ejercicio por repeticiones.
 
+      // 1. Calculamos el tiempo transcurrido (en segundos).
+      const endTime = Date.now();
+      const timeSpentInSeconds = (endTime - currentExerciseStartTimeRef.current) / 1000;
+
+      // 2. Guardamos ese tiempo en nuestro registro de duraciones.
+      exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpentInSeconds;
+
+      // 3. Vaciamos el bolsillo para el siguiente ejercicio.
+      currentExerciseStartTimeRef.current = null;
+    }
+    // --- FIN DEL BLOQUE AÑADIDO ---
 
     if (sessionPhase === 'EXERCISE') {
       markCurrentExerciseAsCompletedInRun();
@@ -479,10 +506,16 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
         if (currentExerciseInternalIndex < totalExercises - 1) {
           initializeExerciseState(currentExerciseInternalIndex + 1);
         } else { 
+          // Guardamos el tiempo del último ejercicio por tiempo (si lo hubo)
+          const lastEx = exercises[currentExerciseInternalIndex];
+          const lastExDuration = parseTimeToSeconds(lastEx.repetitions);
+          if(lastExDuration > 0) {
+            exerciseActualDurationsRef.current[currentExerciseInternalIndex] = lastExDuration;
+          }
           onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
         }
       }
-    } else { 
+    } else { // Si estábamos en un descanso
       if (currentExerciseInternalIndex < totalExercises - 1) {
         initializeExerciseState(currentExerciseInternalIndex + 1);
       } else { 

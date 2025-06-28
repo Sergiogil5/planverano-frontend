@@ -118,9 +118,21 @@ const ApiService = {
     },
     
     // Dejamos esta simulada por ahora
-    deletePlayer: async (): Promise<{ success: boolean; message: string }> => {
-        console.log("Simulando borrado de jugador...");
-        return { success: true, message: 'Simulado' }
+    deletePlayer: async (userId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    });
+
+    if (!response.ok) {
+        // Si hay un error, lo lanzamos para que se pueda capturar en el componente
+        const errorText = await response.text();
+        throw new Error(errorText || "Error al eliminar el jugador.");
+    }
+
+    // Si la respuesta es 204 No Content (éxito), no hay cuerpo JSON que parsear.
+    // Devolvemos un mensaje de éxito genérico.
+    return { success: true, message: `Jugador con ID ${userId} eliminado.` };
     }
 };
 

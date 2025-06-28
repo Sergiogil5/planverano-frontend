@@ -477,49 +477,48 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
     );
   }
   
-  const handleNextClick = () => {
-    // Detenemos la voz y cualquier timer visible que pudiera estar corriendo
-    window.speechSynthesis.cancel();
+    const handleNextClick = () => {
+    // 1. Detenemos cualquier actividad en curso (voz, timer, GPS)
     setTimerIsActive(false); 
+    window.speechSynthesis.cancel();
     stopLocationTracking(currentExerciseInternalIndex);
-    // --- ¡AÑADE ESTE BLOQUE AL PRINCIPIO! ---
-    // Primero, comprobamos si nuestro bolsillo secreto tiene algo.
-    if (sessionPhase === 'EXERCISE' && currentExerciseStartTimeRef.current) {
-      // Si lo tiene, significa que venimos de un ejercicio por repeticiones.
 
-      // 1. Calculamos el tiempo transcurrido (en segundos).
-      const endTime = Date.now();
-      const timeSpentInSeconds = (endTime - currentExerciseStartTimeRef.current) / 1000;
-
-      // 2. Guardamos ese tiempo en nuestro registro de duraciones.
-      exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpentInSeconds;
-
-      // 3. Vaciamos el bolsillo para el siguiente ejercicio.
-      currentExerciseStartTimeRef.current = null;
-    }
-    // --- FIN DEL BLOQUE AÑADIDO ---
-
+    // --- ¡AQUÍ ESTÁ LA CORRECCIÓN MÁS IMPORTANTE! ---
+    // 2. Comprobamos si el paso que acaba de terminar era un EJERCICIO
     if (sessionPhase === 'EXERCISE') {
-      markCurrentExerciseAsCompletedInRun();
-      const restStarted = initializeRestState(currentExerciseInternalIndex);
-      if (!restStarted) { 
-        if (currentExerciseInternalIndex < totalExercises - 1) {
-          initializeExerciseState(currentExerciseInternalIndex + 1);
-        } else { 
-          // Guardamos el tiempo del último ejercicio por tiempo (si lo hubo)
-          const lastEx = exercises[currentExerciseInternalIndex];
-          const lastExDuration = parseTimeToSeconds(lastEx.repetitions);
-          if(lastExDuration > 0) {
-            exerciseActualDurationsRef.current[currentExerciseInternalIndex] = lastExDuration;
-          }
-          onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
-        }
+      let timeSpentInSeconds = 0;
+
+      // 2a. Si tenía un 'startTime' (era por repeticiones), calculamos el tiempo real
+      if (currentExerciseStartTimeRef.current) {
+        timeSpentInSeconds = (Date.now() - currentExerciseStartTimeRef.current) / 1000;
+      } 
+      // 2b. Si NO tenía 'startTime' (era por tiempo), calculamos el tiempo real que ha pasado
+      else {
+        timeSpentInSeconds = initialDurationInSeconds - timeLeftInSeconds;
       }
-    } else { // Si estábamos en un descanso
-      if (currentExerciseInternalIndex < totalExercises - 1) {
-        initializeExerciseState(currentExerciseInternalIndex + 1);
-      } else { 
+      
+      // 2c. Guardamos el tiempo calculado en nuestro registro
+      exerciseActualDurationsRef.current[currentExerciseInternalIndex] = timeSpentInSeconds;
+    }
+    // --- FIN DE LA CORRECCIÓN ---
+
+    // 3. Vaciamos el bolsillo del cronómetro fantasma para el siguiente paso
+    currentExerciseStartTimeRef.current = null;
+    
+    // 4. Lógica para avanzar al siguiente paso (esta ya la tenías y estaba bien)
+    const isLastExercise = currentExerciseInternalIndex >= totalExercises - 1;
+    const currentEx = exercises[currentExerciseInternalIndex];
+    const restDuration = parseTimeToSeconds(currentEx.rest);
+
+    if (sessionPhase === 'EXERCISE' && restDuration > 0) {
+      // Si hay descanso, pasamos a la fase de descanso
+      initializeRestState(currentExerciseInternalIndex);
+    } else {
+      // Si no hay descanso o veníamos de un descanso, pasamos al siguiente ejercicio
+      if (isLastExercise) {
         onClose('completed', Array.from(completedIndicesInRunRef.current), { ...exerciseActualDurationsRef.current }, { ...allCollectedRoutesRef.current });
+      } else {
+        initializeExerciseState(currentExerciseInternalIndex + 1);
       }
     }
   };

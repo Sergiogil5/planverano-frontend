@@ -225,27 +225,26 @@ const PlayerFeedbackDetailView: React.FC<PlayerFeedbackDetailViewProps> = ({ pla
                       <div className="mt-3 pt-3 border-t border-gray-600">
                         <h4 className="text-md font-semibold text-purple-200 mb-2">Detalles de la Sesión:</h4>
                         <ul className="space-y-1.5 text-xs">
-                          {exercisesForDay.map((exercise, index) => {
-                            const actualDurationSeconds = tiempos[index];
-                            const routeData = rutas[index];
-                            
-                            if (actualDurationSeconds === undefined && (!routeData || routeData.length === 0)) {
-                              return null;
-                            }
+                          {Object.entries(tiempos).map(([indexStr, duration]) => {
+                            // exerciseIndex es el "0", "1", "2"... y duration es el tiempo en segundos
+                            const exerciseIndex = parseInt(indexStr, 10);
+                            const exerciseInfo = exercisesForDay[exerciseIndex];
+                            const routeData = rutas[exerciseIndex];
+
+                            // Si por alguna razón no encontramos el nombre del ejercicio, no lo mostramos
+                            if (!exerciseInfo) return null;
 
                             return (
-                              <li key={index} className="py-1.5 px-2 bg-gray-600 rounded">
+                              <li key={exerciseIndex} className="py-1.5 px-2 bg-gray-600 rounded">
                                 <div className="flex justify-between items-center mb-1">
-                                  <span className="text-gray-300 flex-1 mr-2">{exercise.name}</span>
-                                  {actualDurationSeconds !== undefined && (
-                                    <span className="font-mono text-green-300">
-                                      {formatDuration(actualDurationSeconds)}
-                                    </span>
-                                  )}
-
+                                  <span className="text-gray-300 flex-1 mr-2">{exerciseInfo.name} <span className="text-gray-400 text-xxs">(Meta: {exerciseInfo.repetitions})</span>
+                                  </span>
+                                  <span className="font-mono text-green-300">
+                                    {formatDuration(duration)}
+                                  </span>
                                 </div>
                                 {routeData && routeData.length > 0 && (
-                                  <RouteMap routeCoordinates={routeData} exerciseName={exercise.name} />
+                                  <RouteMap routeCoordinates={routeData} exerciseName={exerciseInfo.name} />
                                 )}
                               </li>
                             );

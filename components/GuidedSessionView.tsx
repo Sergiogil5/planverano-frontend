@@ -317,6 +317,15 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
     accumulatedTimeForCurrentExerciseRef.current = 0;
 
     if (initialState) {
+      console.log("Reanudando sesión con estado inicial:", initialState);
+      
+      // ¡AQUÍ ESTÁ LA CLAVE! Cargamos los datos anteriores
+      if (initialState.accumulatedDurations) {
+        exerciseActualDurationsRef.current = initialState.accumulatedDurations;
+      }
+      if (initialState.accumulatedRoutes) {
+        allCollectedRoutesRef.current = initialState.accumulatedRoutes;
+      }
       if (initialState.phase === 'EXERCISE') {
         initializeExerciseState(initialState.exerciseIndex, initialState.timeLeftInSeconds, initialState.initialDurationInSeconds, initialState.phase);
       } else { 

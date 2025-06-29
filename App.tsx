@@ -601,11 +601,25 @@ const AppContent: React.FC = () => {
   }
 
   if (guidedSessionDay && weekData) {
-    const initialSessionState = (pausedSessionDetails && 
-      pausedSessionDetails.weekNumber === weekData.weekNumber &&
-      pausedSessionDetails.dayName === guidedSessionDay.dayName) 
-      ? pausedSessionDetails 
-      : null;
+    let initialSessionState: PausedSessionState | null = null;
+
+    if (pausedSessionDetails && 
+        pausedSessionDetails.weekNumber === currentWeekNumber &&
+        pausedSessionDetails.dayName === guidedSessionDay.dayName) 
+    {
+        const dayKey = getDayKey(currentWeekNumber, guidedSessionDay.dayName);
+        const progressForDay = userProgress[dayKey];
+        
+        initialSessionState = {
+            // "Vuelca aquí todo el contenido de la caja 'pausedSessionDetails'"
+            ...pausedSessionDetails,
+
+            // "Y ahora, añade estas dos propiedades extra"
+            accumulatedDurations: progressForDay?.exerciseActualDurations || {},
+            accumulatedRoutes: progressForDay?.exerciseRoutes || {},
+        };
+    }
+      
 
     return (
       <GuidedSessionView 
@@ -631,9 +645,9 @@ const AppContent: React.FC = () => {
     return <div className="p-4 text-center text-red-500">Error: Semana no encontrada.</div>;
   }
   
-// LÍNEA CORREGIDA
-const userTitle = `${currentUser.nombreCompleto} (${currentUser.rol === 'ENTRENADOR' ? 'Admin' : currentUser.team})`;
-console.log("Usuario actual:", currentUser); // <--- AÑADE ESTA LÍNEA
+  // LÍNEA CORREGIDA
+  const userTitle = `${currentUser.nombreCompleto} (${currentUser.rol === 'ENTRENADOR' ? 'Admin' : currentUser.team})`;
+  console.log("Usuario actual:", currentUser); // <--- AÑADE ESTA LÍNEA
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-100 to-blue-100 text-gray-800">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ApiService from './ApiService';
-import { User, PlayerFeedbackDisplay, Exercise, Coordinate } from '../types';
+import { User, PlayerFeedbackDisplay, Exercise, Coordinate, ApiBloque } from '../types';
 import { TRAINING_DATA } from '../constants';
 import ChevronLeftIcon from './icons/ChevronLeftIcon'; 
 import TrashIcon from './icons/TrashIcon'; // Import TrashIcon
@@ -228,23 +228,25 @@ const PlayerFeedbackDetailView: React.FC<PlayerFeedbackDetailViewProps> = ({ pla
                           {Object.entries(tiempos).map(([indexStr, duration]) => {
                             // exerciseIndex es el "0", "1", "2"... y duration es el tiempo en segundos
                             const exerciseIndex = parseInt(indexStr, 10);
-                            const exerciseInfo = exercisesForDay[exerciseIndex];
+                            // ¡CAMBIO CLAVE! Buscamos el nombre del ejercicio DIRECTAMENTE
+                            // en los datos que vienen del backend para ese día.
+                            // Esto es mucho más robusto.
+                            const exerciseName = fb.sesion.bloques
+                                ?.flatMap((b: ApiBloque) => b.pasos)
+                                ?.[exerciseIndex]?.nombreEjercicio || `Ejercicio ${exerciseIndex + 1}`;
                             const routeData = rutas[exerciseIndex];
 
-                            // Si por alguna razón no encontramos el nombre del ejercicio, no lo mostramos
-                            if (!exerciseInfo) return null;
-
+                            
                             return (
                               <li key={exerciseIndex} className="py-1.5 px-2 bg-gray-600 rounded">
                                 <div className="flex justify-between items-center mb-1">
-                                  <span className="text-gray-300 flex-1 mr-2">{exerciseInfo.name} <span className="text-gray-400 text-xxs">(Meta: {exerciseInfo.repetitions})</span>
-                                  </span>
+                                  <span className="text-gray-300 flex-1 mr-2">{exerciseName} </span>                                  
                                   <span className="font-mono text-green-300">
                                     {formatDuration(duration)}
                                   </span>
                                 </div>
                                 {routeData && routeData.length > 0 && (
-                                  <RouteMap routeCoordinates={routeData} exerciseName={exerciseInfo.name} />
+                                  <RouteMap routeCoordinates={routeData} exerciseName={exerciseName} />
                                 )}
                               </li>
                             );

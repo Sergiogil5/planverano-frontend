@@ -41,6 +41,8 @@ export interface PausedSessionState {
   phase: 'EXERCISE' | 'REST';
   timeLeftInSeconds: number;
   initialDurationInSeconds: number;
+  accumulatedDurations?: ExercisePerformanceData;
+  accumulatedRoutes?: ExerciseRoutesData;
   // No need to store exerciseActualDurations or exerciseRoutes here as they are accumulated/restarted
 }
 

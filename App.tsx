@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { TRAINING_DATA } from './constants';
-import { ApiTrainingDay, ApiResponse_TrainingWeek, ApiBloque, ApiPaso, TrainingWeek, TrainingDay, PausedSessionState, User, SessionFeedbackData, UserDayProgress, ActivityLibreDetails, ExercisePerformanceData, ExerciseRoutesData } from './types';
+import { ApiTrainingDay, ApiResponse_TrainingWeek, ApiBloque, ApiPaso, TrainingWeek, TrainingDay, PausedSessionState, User, SessionFeedbackData, UserDayProgress, ActivityLibreDetails, ExercisePerformanceData, ExerciseRoutesData, Exercise } from './types';
 import WeekSelector from './components/WeekSelector';
 import WeekView from './components/WeekView';
 import LinkIcon from './components/icons/LinkIcon';
@@ -150,22 +150,28 @@ const AppContent: React.FC = () => {
         // 2. TRADUCCIÓN de la estructura de la API a la estructura del frontend
         const daysParaFrontend: TrainingDay[] = apiResponse.days.map((dayFromApi: ApiTrainingDay) => {
           
-          const aplanados = (dayFromApi.bloques || []).flatMap(bloque => {
-            const pasosDelBloque = bloque.pasos.map(paso => ({
-              name: paso.nombreEjercicio,
-              repetitions: `${paso.cantidad} ${paso.tipoMedida.includes('MINUTOS') ? 'min' : paso.tipoMedida.includes('SEGUNDOS') ? 'seg' : ''}`.trim(),
-              rest: `${paso.descansoDespuesSeg} seg`,
-              gifUrl: paso.gifUrl || undefined,
-            }));
-            return Array.from({ length: bloque.repeticionesBloque }, () => pasosDelBloque).flat();
+          const aplanados: Exercise[] = [];
+          (dayFromApi.bloques || []).forEach(bloque => {
+            // Repetimos el bloque entero el número de veces necesario
+            for (let i = 0; i < bloque.repeticionesBloque; i++) {
+              // Para cada repetición del bloque, añadimos sus pasos a la lista
+              bloque.pasos.forEach(paso => {
+                // ¡CLAVE! Creamos un NUEVO objeto de ejercicio para cada paso de cada repetición
+                aplanados.push({
+                  name: paso.nombreEjercicio,
+                  repetitions: `${paso.cantidad} ${paso.tipoMedida.includes('MINUTOS') ? 'min' : paso.tipoMedida.includes('SEGUNDOS') ? 'seg' : ''}`.trim(),
+                  rest: `${paso.descansoDespuesSeg} seg`,
+                  gifUrl: paso.gifUrl || undefined,
+                });
+              });
+            }
           });
           
-          // Creamos el objeto TrainingDay que el frontend espera
           return {
             id: dayFromApi.id,
             dayName: dayFromApi.titulo,
             notes: dayFromApi.descripcion || undefined,
-            exercises: aplanados,
+            exercises: aplanados, // Ahora 'aplanados' es una lista de objetos únicos
           };
         });
 

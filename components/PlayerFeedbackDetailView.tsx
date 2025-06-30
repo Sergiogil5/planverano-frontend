@@ -70,14 +70,14 @@ const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; 
                     <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver al Historial
                 </button>
             </header>
-            <div className="overflow-y-auto custom-scrollbar-details pr-2 flex-1">
+            <div className="overflow-y-auto custom-scrollbar-details pr-2 flex-grow">
                 <div className="flex justify-between items-start mb-2">
                     <span className="font-semibold text-lg text-purple-300">Semana {sesion.numeroSemana} - {sesion.titulo}</span>
                     <span className="text-xs text-gray-400">{new Date(completedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</span>
                 </div>
                 <div className="flex items-center mb-3 p-3 bg-gray-600 rounded-lg">
-                    <span className="text-4xl mr-3">{feedbackEmoji}</span>
-                    <span className="text-lg text-gray-200">{feedbackLabel}</span>
+                    <span className="text-4xl mr-3">{feedback.feedbackEmoji}</span>
+                    <span className="text-lg text-gray-200">{feedback.feedbackLabel}</span>
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-600">
                     <h4 className="text-md font-semibold text-purple-200 mb-2">Tiempos de Ejercicio:</h4>

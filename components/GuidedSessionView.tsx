@@ -1,7 +1,7 @@
 // src/components/GuidedSessionView.tsx
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { TrainingDay, Exercise, PausedSessionState, GuidedSessionViewProps as CustomGuidedSessionViewProps, ExercisePerformanceData, Coordinate, ExerciseRoutesData } from '../types';
+import { TrainingDay, Exercise, PausedSessionState, GuidedSessionViewProps as OriginalGuidedSessionViewProps, ExercisePerformanceData, Coordinate, ExerciseRoutesData } from '../types';
 import XCircleIcon from './icons/XCircleIcon';
 import ChevronLeftIcon from './icons/ChevronLeftIcon';
 import ChevronRightIcon from './icons/ChevronRightIcon';
@@ -12,7 +12,15 @@ import ArrowRightStartOnRectangleIcon from './icons/ArrowRightStartOnRectangleIc
 import ClockIcon from './icons/ClockIcon';
 import LinkIcon from './icons/LinkIcon';
 
+// --- INTERFAZ DE PROPS COMPLETA Y CORRECTA ---
+// Extendemos la interfaz original que viene de types.ts y le añadimos la nueva prop.
+interface CustomGuidedSessionViewProps extends OriginalGuidedSessionViewProps {
+    postWorkoutStretchUrl: string;
+}
+
 // --- Funciones de Ayuda y Constantes (Completas) ---
+
+// Tu código de antes
 const parseTimeToSeconds = (timeStr: string): number => {
     if (!timeStr || typeof timeStr !== 'string') return 0;
     const sanitizedTimeStr = timeStr.toLowerCase().replace(/\s+/g, '');
@@ -80,7 +88,7 @@ const RUNNING_EXERCISES = ['carrera suave', 'carrera continua'];
 // ==   EL COMPONENTE COMPLETO Y REFACTORIZADO EMPIEZA AQUÍ                           ==
 // ====================================================================================
 
-const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClose, onPauseAndExit, initialState }) => {
+const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClose, onPauseAndExit, postWorkoutStretchUrl, initialState }) => {
     
     // --- ESTADOS Y REFS (SIMPLIFICADOS PERO COMPLETOS) ---
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -357,6 +365,19 @@ const GuidedSessionView: React.FC<CustomGuidedSessionViewProps> = ({ day, onClos
                                 <div className="bg-gray-750 p-3 sm:p-4 rounded-lg mb-3 shadow">
                                     <h3 className="text-2xl md:text-3xl font-semibold text-yellow-400 mb-2">{currentExercise.name}</h3>
                                 </div>
+                                {currentExercise.name.toLowerCase().includes('estiramientos') && (
+                                  <div className="mt-4">
+                                    <a
+                                      href={postWorkoutStretchUrl} // Usamos la prop que ya recibe el componente
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center justify-center px-4 py-3 my-2 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-teal-500 hover:bg-teal-600"
+                                    >
+                                      <LinkIcon className="w-5 h-5 mr-2" />
+                                      Ver Video de Estiramientos
+                                    </a>
+                                  </div>
+                                )}
                                 {isTimedStep ? (
                                     <div className="text-6xl sm:text-8xl font-mono font-bold text-green-400 my-4 tabular-nums">{formatTime(timeLeft)}</div>
                                 ) : (

@@ -473,7 +473,6 @@ const AppContent: React.FC = () => {
 
   const handleOpenAdminDashboard = () => {
     setShowAdminDashboard(true);
-    document.body.style.overflow = 'hidden';
   };
 
   const handleActivityLibreSubmit = async (details: ActivityLibreDetails) => {

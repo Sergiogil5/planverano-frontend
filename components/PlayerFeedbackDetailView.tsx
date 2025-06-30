@@ -6,7 +6,7 @@ import { User, Coordinate, ApiBloque } from '../types';
 import ChevronLeftIcon from './icons/ChevronLeftIcon'; 
 import L from 'leaflet';
 
-// --- INTERFAZ PARA EL FEEDBACK (Define la estructura que esperamos de la API) ---
+// --- INTERFAZ ---
 interface FeedbackFromApi {
     id: number;
     completedAt: string;
@@ -17,7 +17,7 @@ interface FeedbackFromApi {
     sesion: {
         id: number;
         numeroSemana: number;
-        titulo: string;
+        titulo:string;
         bloques: ApiBloque[] | null;
     };
 }
@@ -27,36 +27,23 @@ const RouteMap: React.FC<{ routeCoordinates: Coordinate[]; exerciseName: string 
     const mapContainerRef = useRef<HTMLDivElement>(null);
     useEffect(() => {
         if (!mapContainerRef.current || routeCoordinates.length === 0) return;
-
         const map = L.map(mapContainerRef.current).setView([routeCoordinates[0].lat, routeCoordinates[0].lng], 15);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         const latLngs = routeCoordinates.map(c => L.latLng(c.lat, c.lng));
         const polyline = L.polyline(latLngs, { color: 'blue' }).addTo(map);
         map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
-
-        return () => {
-            map.remove();
-        }; 
+        return () => { map.remove(); };
     }, [routeCoordinates, exerciseName]);
-
-    if (routeCoordinates.length === 0) {
-        return null;
-    }
-
+    if (routeCoordinates.length === 0) return null;
     return <div ref={mapContainerRef} style={{ height: '200px', width: '100%', borderRadius: '8px', marginTop: '8px' }} />;
 };
 
 // --- VISTA DE DETALLE DE UNA SESIÓN ---
-// NUEVO: Añadimos una prop `scrollContainerRef` para poder controlar el scroll desde el componente padre.
 const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; scrollContainerRef: React.Ref<HTMLDivElement> }> = ({ feedback, onBack, scrollContainerRef }) => {
     const { sesion, completedAt, feedbackEmoji, feedbackLabel, tiemposJson, rutaGpsJson } = feedback;
-    
     const tiempos: Record<number, number> = JSON.parse(tiemposJson || '{}');
     const rutas: Record<number, Coordinate[]> = JSON.parse(rutaGpsJson || '{}');
-
-    const allExercisesInOrder = sesion.bloques?.flatMap(
-        bloque => Array.from({ length: bloque.repeticionesBloque }, () => bloque.pasos).flat()
-    ) || [];
+    const allExercisesInOrder = sesion.bloques?.flatMap(b => Array.from({ length: b.repeticionesBloque }, () => b.pasos).flat()) || [];
 
     return (
         <div className="flex flex-col h-full">
@@ -66,15 +53,14 @@ const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; 
                     <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver al Historial
                 </button>
             </header>
-            {/* NUEVO: Asignamos el ref al div que tiene el scroll */}
             <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar-details pr-2">
                 <div className="flex justify-between items-start mb-2">
                     <span className="font-semibold text-lg text-purple-300">Semana {sesion.numeroSemana} - {sesion.titulo}</span>
                     <span className="text-xs text-gray-400">{new Date(completedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</span>
                 </div>
                 <div className="flex items-center mb-3 p-3 bg-gray-600 rounded-lg">
-                    <span className="text-4xl mr-3">{feedback.feedbackEmoji}</span>
-                    <span className="text-lg text-gray-200">{feedback.feedbackLabel}</span>
+                    <span className="text-4xl mr-3">{feedbackEmoji}</span>
+                    <span className="text-lg text-gray-200">{feedbackLabel}</span>
                 </div>
                 <div className="mt-4 pt-4 border-t border-gray-600">
                     <h4 className="text-md font-semibold text-purple-200 mb-2">Tiempos de Ejercicio:</h4>
@@ -96,7 +82,7 @@ const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; 
                             })}
                         </ul>
                     ) : (
-                        <p className="text-sm italic text-gray-400">No se registraron tiempos para esta sesión (ej. Actividad Libre).</p>
+                        <p className="text-sm italic text-gray-400">No se registraron tiempos para esta sesión.</p>
                     )}
                 </div>
             </div>
@@ -124,53 +110,20 @@ const FeedbackList: React.FC<{ feedbacks: FeedbackFromApi[]; onSelect: (fb: Feed
     </ul>
 );
 
-// NUEVO: Componente reutilizable para los botones de scroll
-const ScrollControls: React.FC<{ scrollRef: React.RefObject<HTMLElement | null> }> = ({ scrollRef }) => {
-    
-    // Función para hacer scroll. El valor de `amount` será positivo para bajar y negativo para subir.
-    const handleScroll = (amount: number) => {
-        scrollRef.current?.scrollBy({
-            top: amount,
-            behavior: 'smooth' // Para que el scroll sea suave
-        });
-    };
 
-    return (
-        <div className="fixed bottom-6 right-6 flex flex-col space-y-2 z-50">
-            {/* Botón para subir */}
-            <button
-                onClick={() => handleScroll(-300)} // Un valor negativo hace scroll hacia arriba
-                aria-label="Scroll hacia arriba"
-                className="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-purple-700 transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-            </button>
-            {/* Botón para bajar */}
-            <button
-                onClick={() => handleScroll(300)} // Un valor positivo hace scroll hacia abajo
-                aria-label="Scroll hacia abajo"
-                className="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-purple-700 transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-purple-400"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-            </button>
-        </div>
-    );
-};
-
-
-// --- COMPONENTE PRINCIPAL (GESTOR DE VISTAS) ---
+// --- COMPONENTE PRINCIPAL ---
 const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }> = ({ player, onClose }) => {
     const [allFeedback, setAllFeedback] = useState<FeedbackFromApi[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedFeedback, setSelectedFeedback] = useState<FeedbackFromApi | null>(null);
+    // NUEVO: Estado para mostrar el botón de scroll
+    const [showScrollTop, setShowScrollTop] = useState(false);
 
-    // NUEVO: Creamos un ref para cada uno de los contenedores que pueden tener scroll
     const listContainerRef = useRef<HTMLDivElement>(null);
     const detailContainerRef = useRef<HTMLDivElement>(null);
+
+    // NUEVO: El ref que está activo en cada momento (lista o detalle)
+    const activeScrollRef = selectedFeedback ? detailContainerRef : listContainerRef;
 
     useEffect(() => {
         setLoading(true);
@@ -183,19 +136,40 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
             .finally(() => setLoading(false));
     }, [player.id]);
 
+    // NUEVO: Efecto para detectar el scroll y mostrar/ocultar el botón
+    useEffect(() => {
+        const scrollContainer = activeScrollRef.current;
+        if (!scrollContainer) return;
+
+        const handleScroll = () => {
+            if (scrollContainer.scrollTop > 300) {
+                setShowScrollTop(true);
+            } else {
+                setShowScrollTop(false);
+            }
+        };
+
+        scrollContainer.addEventListener('scroll', handleScroll);
+        // Limpiamos el evento al desmontar o cambiar el ref
+        return () => {
+            scrollContainer.removeEventListener('scroll', handleScroll);
+        };
+    }, [activeScrollRef]); // Se re-ejecuta si cambiamos entre lista y detalle
+
+    // NUEVO: Función para hacer scroll hacia arriba
+    const scrollToTop = () => {
+        activeScrollRef.current?.scrollTo({
+            top: 0,
+            behavior: 'smooth'
+        });
+    };
+
     return (
-        // NUEVO: Añadimos 'relative' para que los botones con 'position: fixed' se posicionen correctamente dentro de este contenedor si fuera necesario, aunque en este caso se posicionarán respecto a la ventana.
-        <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full overflow-hidden text-white relative">
+        // CORRECCIÓN: Eliminado 'overflow-hidden' para permitir scroll natural
+        <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full text-white">
             {selectedFeedback ? (
-                // Si hay un feedback seleccionado, muestra la vista de detalle
-                // NUEVO: Pasamos el ref correspondiente al componente de detalle
-                <FeedbackDetail 
-                    feedback={selectedFeedback} 
-                    onBack={() => setSelectedFeedback(null)} 
-                    scrollContainerRef={detailContainerRef} 
-                />
+                <FeedbackDetail feedback={selectedFeedback} onBack={() => setSelectedFeedback(null)} scrollContainerRef={detailContainerRef} />
             ) : (
-                // Si no, muestra el historial
                 <div className="flex flex-col h-full">
                     <header className="flex-shrink-0 flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
                         <h2 className="text-xl font-semibold text-purple-300">Historial de {player.nombreCompleto}</h2>
@@ -203,19 +177,26 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
                              <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver a Jugadores
                         </button>
                     </header>
-                    {/* NUEVO: Asignamos el ref al div que tiene el scroll */}
                     <div ref={listContainerRef} className="flex-grow overflow-y-auto">
-                    {loading ? <p className="text-center p-4">Cargando historial...</p> : 
-                     allFeedback.length === 0 ? <p className="text-center p-4">No hay progresos registrados.</p> :
-                     <FeedbackList feedbacks={allFeedback} onSelect={setSelectedFeedback} />
-                    }
+                        {loading ? <p className="text-center p-4">Cargando historial...</p> : 
+                         allFeedback.length === 0 ? <p className="text-center p-4">No hay progresos registrados.</p> :
+                         <FeedbackList feedbacks={allFeedback} onSelect={setSelectedFeedback} />
+                        }
+                    </div>
                 </div>
-            </div>
             )}
             
-            {/* NUEVO: Renderizamos los botones de scroll y le pasamos el ref que esté activo en cada momento */}
-            <ScrollControls scrollRef={selectedFeedback ? detailContainerRef : listContainerRef} />
-            
+            {/* NUEVO: Botón inteligente de "Scroll hacia arriba" */}
+            {showScrollTop && (
+                <button
+                    onClick={scrollToTop}
+                    aria-label="Scroll hacia arriba"
+                    className="fixed bottom-6 right-6 w-12 h-12 bg-purple-600 bg-opacity-70 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all focus:outline-none focus:ring-2 focus:ring-purple-400 z-50"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                </button>
+            )}
+
             <style>{`.custom-scrollbar-details::-webkit-scrollbar { width: 8px; } .custom-scrollbar-details::-webkit-scrollbar-track { background: #1f2937; } .custom-scrollbar-details::-webkit-scrollbar-thumb { background: #4b5563; }`}</style>
         </div>
     );

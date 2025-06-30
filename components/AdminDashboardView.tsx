@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react'; // NUEVO: Importamos useRef
 import ApiService from './ApiService';
 import { User, PlayerTeam } from '../types';
 import XCircleIcon from './icons/XCircleIcon';
@@ -18,7 +18,11 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [viewingFeedbackForPlayer, setViewingFeedbackForPlayer] = useState<User | null>(null);
 
-  // useEffect para cargar la lista de jugadores cuando el componente se monta
+  // NUEVO: Ref para el contenedor de la lista y estado para el botón de scroll
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  // useEffect para cargar la lista de jugadores (sin cambios)
   useEffect(() => {
     if (!viewingFeedbackForPlayer) {
       const fetchPlayers = async () => {
@@ -26,10 +30,8 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         setError(null);
         try {
           const fetchedPlayers = await ApiService.getAllPlayers();
-          console.log("Jugadores recibidos del backend:", fetchedPlayers);
           setAllPlayers(fetchedPlayers);
         } catch (err) {
-          console.error("Error fetching players:", err);
           setError("No se pudieron cargar los jugadores.");
         } finally {
           setLoadingPlayers(false);
@@ -39,32 +41,49 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   }, [viewingFeedbackForPlayer]);
 
-  // useMemo para agrupar los jugadores por equipo cada vez que la lista 'allPlayers' cambia
+  // NUEVO: Efecto para detectar el scroll en la lista de jugadores y mostrar/ocultar el botón
+  useEffect(() => {
+    // Si estamos viendo el detalle de un jugador, la lógica de scroll la maneja ese componente.
+    // Ocultamos el botón de esta vista y no hacemos nada más.
+    if (viewingFeedbackForPlayer) {
+      setShowScrollTop(false);
+      return;
+    }
+
+    const scrollContainer = listContainerRef.current;
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+        if (scrollContainer.scrollTop > 300) {
+            setShowScrollTop(true);
+        } else {
+            setShowScrollTop(false);
+        }
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    return () => {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [viewingFeedbackForPlayer]); // Se re-evalúa cuando cambiamos de vista
+
+  // useMemo para agrupar jugadores (sin cambios)
   const groupedPlayers = useMemo(() => {
     const groups:  { INFANTIL: User[], CADETE: User[], JUVENIL: User[] } = {
       INFANTIL: [],
       CADETE: [],
       JUVENIL: [],
     };
-    
-    console.log("--- Agrupando jugadores ---");
     allPlayers.forEach(player => {
-      // 3. Hacemos una comprobación simple y directa
       if (player.team && groups[player.team]) {
-      groups[player.team].push(player);
+        groups[player.team].push(player);
       }
     });
-    console.log("--- Fin de la agrupación ---");
-    
-    // 5. Opcional: Ordenamos alfabéticamente los jugadores dentro de cada equipo
     for (const teamName in groups) {
       (groups as any)[teamName].sort((a: User, b: User) => (a.nombreCompleto || '').localeCompare(b.nombreCompleto || ''));
     }
-
     return groups;
   }, [allPlayers]);
-
-  
   
   const handlePlayerSelect = (player: User) => {
     setViewingFeedbackForPlayer(player);
@@ -74,7 +93,15 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     setViewingFeedbackForPlayer(null);
   };
 
-  // Si hemos seleccionado un jugador, mostramos su vista de detalle en lugar de la lista
+  // NUEVO: Función para hacer scroll hacia arriba en la lista de jugadores
+  const scrollToTop = () => {
+    listContainerRef.current?.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+  };
+
+  // Si hemos seleccionado un jugador, mostramos su vista de detalle (sin cambios)
   if (viewingFeedbackForPlayer) {
     return <PlayerFeedbackDetailView 
               player={viewingFeedbackForPlayer} 
@@ -82,9 +109,10 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
            />;
   }
 
-  // Si no, mostramos la lista principal de jugadores por equipo
+  // Si no, mostramos la lista principal de jugadores
   return (
-    <div className="fixed inset-0 bg-gray-900 bg-opacity-95 text-white flex flex-col p-4 z-[150] overflow-hidden">
+    // Ya has quitado 'overflow-hidden' aquí, lo cual es CORRECTO.
+    <div className="fixed inset-0 bg-gray-900 bg-opacity-95 text-white flex flex-col p-4 z-[150]">
       <header className="flex items-center justify-between mb-6 pb-4 border-b border-gray-700 flex-shrink-0">
         <h1 className="text-2xl sm:text-3xl font-bold text-purple-400">Panel de Administrador</h1>
         <button onClick={onClose} className="p-2 rounded-full hover:bg-gray-700 transition-colors" aria-label="Cerrar panel">
@@ -92,7 +120,8 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </button>
       </header>
       
-      <div className="flex-grow overflow-y-auto custom-scrollbar pr-0 sm:pr-2">
+      {/* NUEVO: Asignamos el ref al contenedor que tiene el scroll */}
+      <div ref={listContainerRef} className="flex-1 overflow-y-auto custom-scrollbar pr-0 sm:pr-2">
         <h2 className="text-xl font-semibold text-purple-300 mb-4 text-center">Jugadores</h2>
         {loadingPlayers ? (
           <div className="flex-1 flex items-center justify-center">
@@ -132,6 +161,18 @@ const AdminDashboardView: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         )}
       </div>
+
+      {/* NUEVO: Botón inteligente de "Scroll hacia arriba" para la lista de jugadores */}
+      {showScrollTop && (
+          <button
+              onClick={scrollToTop}
+              aria-label="Scroll hacia arriba"
+              className="fixed bottom-6 right-6 w-12 h-12 bg-purple-600 bg-opacity-70 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-opacity-100 transition-all focus:outline-none focus:ring-2 focus:ring-purple-400 z-50"
+          >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+          </button>
+      )}
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 8px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1f2937; }

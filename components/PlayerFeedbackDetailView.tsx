@@ -1,314 +1,174 @@
+// src/components/PlayerFeedbackDetailView.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import ApiService from './ApiService';
-import { User, PlayerFeedbackDisplay, Exercise, Coordinate, ApiBloque } from '../types';
-import { TRAINING_DATA } from '../constants';
+import { User, Coordinate, ApiBloque } from '../types';
 import ChevronLeftIcon from './icons/ChevronLeftIcon'; 
-import TrashIcon from './icons/TrashIcon'; // Import TrashIcon
-import XCircleIcon from './icons/XCircleIcon'; // For modal close
-import L from 'leaflet'; // Import Leaflet
+import L from 'leaflet';
 
-// Helper function to check if an exercise is a running exercise
-const RUNNING_EXERCISES_FOR_TRACKING = ['carrera suave', 'carrera continua'];
-
-// Map Component (nested for simplicity, can be moved to its own file)
-interface RouteMapProps {
-  routeCoordinates: Coordinate[];
-  exerciseName: string;
+// --- INTERFAZ PARA EL FEEDBACK (Define la estructura que esperamos de la API) ---
+interface FeedbackFromApi {
+    id: number;
+    completedAt: string;
+    feedbackEmoji: string;
+    feedbackLabel: string;
+    tiemposJson?: string;
+    rutaGpsJson?: string;
+    sesion: { // Objeto SesionDiaria anidado, enviado por el backend
+        id: number;
+        numeroSemana: number;
+        titulo: string;
+        bloques: ApiBloque[] | null; // <-- ¡La fuente de la verdad para los ejercicios!
+    };
 }
 
-const RouteMap: React.FC<RouteMapProps> = ({ routeCoordinates, exerciseName }) => {
-  const mapRef = useRef<L.Map | null>(null);
-  const mapContainerRef = useRef<HTMLDivElement | null>(null);
+// --- COMPONENTE MAPA ---
+const RouteMap: React.FC<{ routeCoordinates: Coordinate[]; exerciseName: string }> = ({ routeCoordinates, exerciseName }) => {
+    const mapContainerRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!mapContainerRef.current || routeCoordinates.length === 0) return;
 
-  useEffect(() => {
-    if (mapContainerRef.current && !mapRef.current && routeCoordinates.length > 0) {
-      // Initialize map
-      mapRef.current = L.map(mapContainerRef.current).setView([routeCoordinates[0].lat, routeCoordinates[0].lng], 15);
+        const map = L.map(mapContainerRef.current).setView([routeCoordinates[0].lat, routeCoordinates[0].lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        const latLngs = routeCoordinates.map(c => L.latLng(c.lat, c.lng));
+        const polyline = L.polyline(latLngs, { color: 'blue' }).addTo(map);
+        map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
 
-      // Add tile layer
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(mapRef.current);
-
-      // Prepare LatLng array for polyline
-      const latLngs = routeCoordinates.map(coord => L.latLng(coord.lat, coord.lng));
-      
-      // Add polyline to map
-      L.polyline(latLngs, { color: 'blue', weight: 5 }).addTo(mapRef.current);
-
-      // Fit map to bounds of the polyline
-      if (latLngs.length > 0) {
-        mapRef.current.fitBounds(L.polyline(latLngs).getBounds(), { padding: [30, 30] }); // Increased padding
-        
-        // Add markers for start and end points
-        L.marker(latLngs[0], { title: `Inicio: ${exerciseName}` })
-          .addTo(mapRef.current)
-          .bindPopup(`<b>Inicio:</b> ${exerciseName}`)
-          .openPopup();
-          
-        if (latLngs.length > 1) {
-          L.marker(latLngs[latLngs.length - 1], { title: `Fin: ${exerciseName}` })
-            .addTo(mapRef.current)
-            .bindPopup(`<b>Fin:</b> ${exerciseName}`);
-        }
-      }
+        // ¡SOLUCIÓN! Envolvemos la limpieza en una función que no devuelve nada.
+        return () => {
+            map.remove();
+        }; 
+    }, [routeCoordinates, exerciseName]);
+    // ¡SOLUCIÓN! Si no hay coordenadas, devolvemos null explícitamente.
+    if (routeCoordinates.length === 0) {
+        return null;
     }
+
+    // Si hay coordenadas, devolvemos el div del mapa.
+    return <div ref={mapContainerRef} style={{ height: '200px', width: '100%', borderRadius: '8px', marginTop: '8px' }} />;
+};
+
+// --- VISTA DE DETALLE DE UNA SESIÓN ---
+const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; }> = ({ feedback, onBack }) => {
+    const { sesion, completedAt, feedbackEmoji, feedbackLabel, tiemposJson, rutaGpsJson } = feedback;
     
-    // Cleanup function to remove map instance when component unmounts or coordinates change
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, [routeCoordinates, exerciseName]); // Re-run effect if coordinates or exerciseName change
+    // 1. Parseamos los JSON de tiempos y rutas
+    const tiempos: Record<number, number> = JSON.parse(tiemposJson || '{}');
+    const rutas: Record<number, Coordinate[]> = JSON.parse(rutaGpsJson || '{}');
 
-  if (routeCoordinates.length === 0) {
-    return <p className="text-gray-400 text-sm italic py-2">No hay datos de ruta GPS para mostrar para: {exerciseName}.</p>;
-  }
+    // 2. ¡AQUÍ ESTÁ LA LÓGICA CLAVE!
+    // Reconstruimos la lista de ejercicios en orden, usando los datos del backend.
+    const allExercisesInOrder = sesion.bloques?.flatMap(
+        bloque => Array.from({ length: bloque.repeticionesBloque }, () => bloque.pasos).flat()
+    ) || [];
 
-  // Ensure map container has a defined height, otherwise it won't be visible
-  return <div ref={mapContainerRef} style={{ height: '250px', width: '100%', borderRadius: '8px', marginBottom: '10px' }} aria-label={`Mapa de ruta para ${exerciseName}`}></div>;
-};
-
-
-// Helper functions
-const formatDuration = (totalSeconds: number): string => {
-  if (isNaN(totalSeconds) || totalSeconds < 0) return 'N/A';
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = Math.floor(totalSeconds % 60);
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-};
-
-const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleString('es-ES', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-};
-
-const getDayExercises = (weekNumber: number, dayName: string): Exercise[] => {
-  const week = TRAINING_DATA.weeks.find(w => w.weekNumber === weekNumber);
-  const day = week?.days.find(d => d.dayName === dayName);
-  return day?.exercises || [];
-};
-
-interface PlayerFeedbackDetailViewProps {
-  player: User;
-  onClose: () => void; 
-}
-
-const PlayerFeedbackDetailView: React.FC<PlayerFeedbackDetailViewProps> = ({ player, onClose }) => {
-  const [playerFeedback, setPlayerFeedback] = useState<PlayerFeedbackDisplay[]>([]);
-  const [loadingFeedback, setLoadingFeedback] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-
-  useEffect(() => {
-    const fetchFeedback = async () => {
-      setLoadingFeedback(true);
-      setError(null);
-      try {
-        const feedback = await ApiService.getPlayerFeedback(String(player.id));
-        setPlayerFeedback(feedback);
-      } catch (err: any ) {
-        console.error(`Error fetching feedback for ${player.nombreCompleto}:`, err);
-        setError("No se pudo cargar el feedback del jugador.");
-        setPlayerFeedback([]);
-      } finally {
-        setLoadingFeedback(false);
-      }
-    };
-    fetchFeedback();
-  }, [player]);
-
-  const playerDisplayName = `${player.nombreCompleto}`;
-  const playerTitle = player.codigoRegistro  
-    ? `${playerDisplayName} (${player.codigoRegistro})` 
-    : playerDisplayName;
-
-  const handleDeletePlayer = async () => {
-    setIsDeleting(true);
-    setDeleteError(null);
-    try {
-      await ApiService.deletePlayer(String(player.id));
-      setShowDeleteConfirmModal(false);
-      onClose(); // Go back to player list
-    } catch (err: any) {
-      console.error("Error deleting player:", err);
-      setDeleteError(err.message || "Error al eliminar el jugador.");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-
-  return (
-    <>
-      <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full overflow-hidden">
-        <header className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
-          <div className="flex-1 min-w-0"> {/* Added for truncation */}
-            <h2 className="text-xl sm:text-2xl font-semibold text-purple-300 truncate" title={`Feedback de ${playerTitle} (${player.team})`}>
-              Feedback de {playerDisplayName} 
-              {player.team && <span className="text-sm text-gray-400 ml-2">({player.team})</span>}
-            </h2>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => setShowDeleteConfirmModal(true)}
-              className="flex items-center text-sm px-3 py-2 bg-red-600 hover:bg-red-700 rounded-lg transition-colors text-white"
-              aria-label="Eliminar jugador"
-              title="Eliminar Jugador"
-            >
-              <TrashIcon className="w-5 h-5 mr-1.5" />
-              Eliminar
-            </button>
-            <button
-              onClick={onClose}
-              className="flex items-center text-sm px-3 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors text-gray-300"
-              aria-label="Volver a la lista de jugadores"
-            >
-              <ChevronLeftIcon className="w-5 h-5 mr-1.5" />
-              Volver
-            </button>
-          </div>
-        </header>
-
-        {loadingFeedback ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-purple-400"></div>
-          </div>
-        ) : error ? (
-           <p className="text-red-400 bg-red-900 p-3 rounded-md text-center flex-1 flex items-center justify-center">{error}</p>
-        ) : playerFeedback.length === 0 ? (
-          <p className="text-gray-400 text-center flex-1 flex items-center justify-center">No hay feedback para este jugador.</p>
-        ) : (
-          <div className="overflow-y-auto custom-scrollbar-details pr-2 flex-1">
-            <ul className="space-y-4">
-              {playerFeedback.map((fb: any) => {
-                // --- ¡AQUÍ ESTÁ LA MAGIA! ---
-                // fb.sesion contiene el objeto SesionDiaria del backend
-                const weekNum = fb.sesion.numeroSemana;
-                const dayName = fb.sesion.titulo;
-                const exercisesForDay = getDayExercises(weekNum, dayName);
-                
-                let tiempos: Record<number, number> = {};
-                if (fb.tiemposJson) {
-                  try { tiempos = JSON.parse(fb.tiemposJson); } catch (e) { console.error("Error al parsear tiemposJson:", e); }
-                }
-
-                let rutas: Record<number, Coordinate[]> = {};
-                if (fb.rutaGpsJson) {
-                  try { rutas = JSON.parse(fb.rutaGpsJson); } catch (e) { console.error("Error al parsear rutaGpsJson:", e); }
-                }
-                return (
-                  <li key={fb.id} className="bg-gray-700 p-4 rounded-md shadow-md">
-                    <div className="flex justify-between items-start mb-2">
-                      <span className="font-semibold text-lg text-purple-300">Semana {weekNum} - {dayName}</span>
-                      <span className="text-xs text-gray-400">{formatDate(fb.completedAt)}</span>
-                    </div>
-                    <div className="flex items-center mb-2">
-                      <span className="text-4xl mr-3">{fb.feedbackEmoji}</span>
-                      <span className="text-lg text-gray-200">{fb.feedbackLabel}</span>
-                    </div>
-                    {fb.feedbackTextoOpcional && (
-                        <p className="text-sm italic text-gray-400 mt-1 pl-2 border-l-2 border-gray-600">"{fb.feedbackTextoOpcional}"</p>
-                    )}
-                    
-                    {(exercisesForDay.length > 0) && (
-                      <div className="mt-3 pt-3 border-t border-gray-600">
-                        <h4 className="text-md font-semibold text-purple-200 mb-2">Detalles de la Sesión:</h4>
-                        <ul className="space-y-1.5 text-xs">
-                          {Object.entries(tiempos).map(([indexStr, duration]) => {
-                            // exerciseIndex es el "0", "1", "2"... y duration es el tiempo en segundos
-                            const exerciseIndex = parseInt(indexStr, 10);
-                            // ¡CAMBIO CLAVE! Buscamos el nombre del ejercicio DIRECTAMENTE
-                            // en los datos que vienen del backend para ese día.
-                            // Esto es mucho más robusto.
-                            const exerciseName = fb.sesion.bloques
-                                ?.flatMap((b: ApiBloque) => b.pasos)
-                                ?.[exerciseIndex]?.nombreEjercicio || `Ejercicio ${exerciseIndex + 1}`;
-                            const routeData = rutas[exerciseIndex];
-
-                            
-                            return (
-                              <li key={exerciseIndex} className="py-1.5 px-2 bg-gray-600 rounded">
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className="text-gray-300 flex-1 mr-2">{exerciseName} </span>                                  
-                                  <span className="font-mono text-green-300">
-                                    {formatDuration(duration)}
-                                  </span>
-                                </div>
-                                {routeData && routeData.length > 0 && (
-                                  <RouteMap routeCoordinates={routeData} exerciseName={exerciseName} />
-                                )}
-                              </li>
-                            );
-                          })}
+    return (
+        <div className="flex flex-col h-full">
+            <header className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
+                <h3 className="text-xl font-semibold text-purple-300">Detalle de Sesión</h3>
+                <button onClick={onBack} className="flex items-center text-sm px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600">
+                    <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver al Historial
+                </button>
+            </header>
+            <div className="overflow-y-auto custom-scrollbar-details pr-2 flex-1">
+                <div className="flex justify-between items-start mb-2">
+                    <span className="font-semibold text-lg text-purple-300">Semana {sesion.numeroSemana} - {sesion.titulo}</span>
+                    <span className="text-xs text-gray-400">{new Date(completedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                </div>
+                <div className="flex items-center mb-3 p-3 bg-gray-600 rounded-lg">
+                    <span className="text-4xl mr-3">{feedbackEmoji}</span>
+                    <span className="text-lg text-gray-200">{feedbackLabel}</span>
+                </div>
+                <div className="mt-4 pt-4 border-t border-gray-600">
+                    <h4 className="text-md font-semibold text-purple-200 mb-2">Tiempos de Ejercicio:</h4>
+                    {Object.keys(tiempos).length > 0 ? (
+                        <ul className="space-y-1.5 text-sm">
+                            {/* 3. Mapeamos los tiempos y usamos el índice para obtener el nombre correcto */}
+                            {Object.entries(tiempos).map(([indexStr, duration]) => {
+                                const index = parseInt(indexStr, 10);
+                                // Obtenemos el nombre del ejercicio de la lista que reconstruimos del backend
+                                const exerciseName = allExercisesInOrder[index]?.nombreEjercicio || `Ejercicio ${index + 1}`;
+                                const routeData = rutas[index];
+                                return (
+                                    <li key={index} className="p-2 bg-gray-700 rounded-md">
+                                        <div className="flex justify-between items-center">
+                                            <span>{exerciseName}</span>
+                                            <span className="font-mono text-green-300">{`${Math.floor(duration / 60).toString().padStart(2, '0')}:${Math.floor(duration % 60).toString().padStart(2, '0')}`}</span>
+                                        </div>
+                                        {routeData && <RouteMap routeCoordinates={routeData} exerciseName={exerciseName} />}
+                                    </li>
+                                );
+                            })}
                         </ul>
-                      </div>
+                    ) : (
+                        <p className="text-sm italic text-gray-400">No se registraron tiempos para esta sesión (ej. Actividad Libre).</p>
                     )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-        <style>{`
-          .custom-scrollbar-details::-webkit-scrollbar { width: 8px; }
-          .custom-scrollbar-details::-webkit-scrollbar-track { background: #1f2937; /* gray-800 */ border-radius: 10px; }
-          .custom-scrollbar-details::-webkit-scrollbar-thumb { background: #4b5563; /* gray-600 */ border-radius: 10px; }
-          .custom-scrollbar-details::-webkit-scrollbar-thumb:hover { background: #6b7280; /* gray-500 */ }
-          .bg-gray-650 { background-color: rgba(75, 85, 99, 0.5); /* gray-600 with opacity */ }
-          .text-xxs { font-size: 0.65rem; line-height: 0.85rem; }
-        `}</style>
-      </div>
-
-      {showDeleteConfirmModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[200] p-4">
-          <div className="bg-gray-800 p-6 rounded-lg shadow-xl text-white max-w-sm w-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 id="delete-confirm-title" className="text-lg font-semibold text-red-400">Confirmar Eliminación</h3>
-              <button onClick={() => setShowDeleteConfirmModal(false)} className="p-1 rounded-full hover:bg-gray-700" aria-label="Cerrar modal">
-                <XCircleIcon className="w-6 h-6 text-gray-400" />
-              </button>
+                </div>
             </div>
-            <p id="delete-confirm-description" className="text-gray-300 mb-6">
-              ¿Estás seguro que quieres eliminar a <strong>{player.nombreCompleto}</strong> del plan de entrenamiento? Esta acción es irreversible.
-            </p>
-            {deleteError && (
-              <div className="bg-red-900 border border-red-700 text-red-300 px-3 py-2 rounded-md relative mb-4 text-sm" role="alert">
-                {deleteError}
-              </div>
-            )}
-            <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3">
-              <button
-                onClick={() => setShowDeleteConfirmModal(false)}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-500 transition-colors disabled:opacity-50 w-full sm:w-auto"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleDeletePlayer}
-                disabled={isDeleting}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50 w-full sm:w-auto"
-              >
-                {isDeleting ? 'Eliminando...' : 'Confirmar Eliminación'}
-              </button>
-            </div>
-          </div>
         </div>
-      )}
-    </>
-  );
+    );
+};
+
+// --- VISTA DE LISTA DE FEEDBACKS ---
+const FeedbackList: React.FC<{ feedbacks: FeedbackFromApi[]; onSelect: (fb: FeedbackFromApi) => void; }> = ({ feedbacks, onSelect }) => (
+    <ul className="space-y-3 overflow-y-auto custom-scrollbar-details pr-2 flex-1">
+        {feedbacks.map((fb) => (
+            <li key={fb.id}>
+                <button onClick={() => onSelect(fb)} className="w-full text-left p-4 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                    <div className="flex justify-between text-sm">
+                        <span className="font-bold text-white">Semana {fb.sesion.numeroSemana} - {fb.sesion.titulo}</span>
+                        <span className="text-gray-400">{new Date(fb.completedAt).toLocaleDateString('es-ES', { day: 'numeric', month: 'long' })}</span>
+                    </div>
+                    <div className="flex items-center mt-2">
+                        <span className="text-2xl mr-2">{fb.feedbackEmoji}</span>
+                        <span className="text-gray-300">{fb.feedbackLabel}</span>
+                    </div>
+                </button>
+            </li>
+        ))}
+    </ul>
+);
+
+// --- COMPONENTE PRINCIPAL (GESTOR DE VISTAS) ---
+const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }> = ({ player, onClose }) => {
+    const [allFeedback, setAllFeedback] = useState<FeedbackFromApi[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedFeedback, setSelectedFeedback] = useState<FeedbackFromApi | null>(null);
+
+    useEffect(() => {
+        setLoading(true);
+        ApiService.getPlayerFeedback(String(player.id))
+            .then(data => {
+                data.sort((a, b) => new Date(b.completedAt).getTime() - new Date(a.completedAt).getTime());
+                setAllFeedback(data);
+            })
+            .catch(console.error)
+            .finally(() => setLoading(false));
+    }, [player.id]);
+
+    return (
+        <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full overflow-hidden text-white">
+            {selectedFeedback ? (
+                // Si hay un feedback seleccionado, muestra la vista de detalle
+                <FeedbackDetail feedback={selectedFeedback} onBack={() => setSelectedFeedback(null)} />
+            ) : (
+                // Si no, muestra el historial
+                <div className="flex flex-col h-full">
+                    <header className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
+                        <h2 className="text-xl font-semibold text-purple-300">Historial de {player.nombreCompleto}</h2>
+                        <button onClick={onClose} className="flex items-center text-sm px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600">
+                             <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver a Jugadores
+                        </button>
+                    </header>
+                    {loading ? <p className="text-center p-4">Cargando historial...</p> : 
+                     allFeedback.length === 0 ? <p className="text-center p-4">No hay progresos registrados.</p> :
+                     <FeedbackList feedbacks={allFeedback} onSelect={setSelectedFeedback} />
+                    }
+                </div>
+            )}
+            <style>{`.custom-scrollbar-details::-webkit-scrollbar { width: 8px; } .custom-scrollbar-details::-webkit-scrollbar-track { background: #1f2937; } .custom-scrollbar-details::-webkit-scrollbar-thumb { background: #4b5563; }`}</style>
+        </div>
+    );
 };
 
 export default PlayerFeedbackDetailView;

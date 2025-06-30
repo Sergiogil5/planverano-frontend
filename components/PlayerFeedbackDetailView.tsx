@@ -154,17 +154,19 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
             ) : (
                 // Si no, muestra el historial
                 <div className="flex flex-col h-full">
-                    <header className="flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
+                    <header className="flex-shrink-0 flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
                         <h2 className="text-xl font-semibold text-purple-300">Historial de {player.nombreCompleto}</h2>
                         <button onClick={onClose} className="flex items-center text-sm px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600">
                              <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver a Jugadores
                         </button>
                     </header>
+                    <div className="flex-grow overflow-y-auto">
                     {loading ? <p className="text-center p-4">Cargando historial...</p> : 
                      allFeedback.length === 0 ? <p className="text-center p-4">No hay progresos registrados.</p> :
                      <FeedbackList feedbacks={allFeedback} onSelect={setSelectedFeedback} />
                     }
                 </div>
+            </div>
             )}
             <style>{`.custom-scrollbar-details::-webkit-scrollbar { width: 8px; } .custom-scrollbar-details::-webkit-scrollbar-track { background: #1f2937; } .custom-scrollbar-details::-webkit-scrollbar-thumb { background: #4b5563; }`}</style>
         </div>

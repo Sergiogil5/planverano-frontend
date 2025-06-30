@@ -14,11 +14,11 @@ interface FeedbackFromApi {
     feedbackLabel: string;
     tiemposJson?: string;
     rutaGpsJson?: string;
-    sesion: { // Objeto SesionDiaria anidado, enviado por el backend
+    sesion: {
         id: number;
         numeroSemana: number;
         titulo: string;
-        bloques: ApiBloque[] | null; // <-- ¡La fuente de la verdad para los ejercicios!
+        bloques: ApiBloque[] | null;
     };
 }
 
@@ -34,30 +34,26 @@ const RouteMap: React.FC<{ routeCoordinates: Coordinate[]; exerciseName: string 
         const polyline = L.polyline(latLngs, { color: 'blue' }).addTo(map);
         map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
 
-        // ¡SOLUCIÓN! Envolvemos la limpieza en una función que no devuelve nada.
         return () => {
             map.remove();
         }; 
     }, [routeCoordinates, exerciseName]);
-    // ¡SOLUCIÓN! Si no hay coordenadas, devolvemos null explícitamente.
+
     if (routeCoordinates.length === 0) {
         return null;
     }
 
-    // Si hay coordenadas, devolvemos el div del mapa.
     return <div ref={mapContainerRef} style={{ height: '200px', width: '100%', borderRadius: '8px', marginTop: '8px' }} />;
 };
 
 // --- VISTA DE DETALLE DE UNA SESIÓN ---
-const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; }> = ({ feedback, onBack }) => {
+// NUEVO: Añadimos una prop `scrollContainerRef` para poder controlar el scroll desde el componente padre.
+const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; scrollContainerRef: React.Ref<HTMLDivElement> }> = ({ feedback, onBack, scrollContainerRef }) => {
     const { sesion, completedAt, feedbackEmoji, feedbackLabel, tiemposJson, rutaGpsJson } = feedback;
     
-    // 1. Parseamos los JSON de tiempos y rutas
     const tiempos: Record<number, number> = JSON.parse(tiemposJson || '{}');
     const rutas: Record<number, Coordinate[]> = JSON.parse(rutaGpsJson || '{}');
 
-    // 2. ¡AQUÍ ESTÁ LA LÓGICA CLAVE!
-    // Reconstruimos la lista de ejercicios en orden, usando los datos del backend.
     const allExercisesInOrder = sesion.bloques?.flatMap(
         bloque => Array.from({ length: bloque.repeticionesBloque }, () => bloque.pasos).flat()
     ) || [];
@@ -70,7 +66,8 @@ const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; 
                     <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver al Historial
                 </button>
             </header>
-            <div className="flex-1 overflow-y-auto custom-scrollbar-details pr-2">
+            {/* NUEVO: Asignamos el ref al div que tiene el scroll */}
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto custom-scrollbar-details pr-2">
                 <div className="flex justify-between items-start mb-2">
                     <span className="font-semibold text-lg text-purple-300">Semana {sesion.numeroSemana} - {sesion.titulo}</span>
                     <span className="text-xs text-gray-400">{new Date(completedAt).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</span>
@@ -83,10 +80,8 @@ const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; 
                     <h4 className="text-md font-semibold text-purple-200 mb-2">Tiempos de Ejercicio:</h4>
                     {Object.keys(tiempos).length > 0 ? (
                         <ul className="space-y-1.5 text-sm">
-                            {/* 3. Mapeamos los tiempos y usamos el índice para obtener el nombre correcto */}
                             {Object.entries(tiempos).map(([indexStr, duration]) => {
                                 const index = parseInt(indexStr, 10);
-                                // Obtenemos el nombre del ejercicio de la lista que reconstruimos del backend
                                 const exerciseName = allExercisesInOrder[index]?.nombreEjercicio || `Ejercicio ${index + 1}`;
                                 const routeData = rutas[index];
                                 return (
@@ -129,11 +124,53 @@ const FeedbackList: React.FC<{ feedbacks: FeedbackFromApi[]; onSelect: (fb: Feed
     </ul>
 );
 
+// NUEVO: Componente reutilizable para los botones de scroll
+const ScrollControls: React.FC<{ scrollRef: React.RefObject<HTMLElement | null> }> = ({ scrollRef }) => {
+    
+    // Función para hacer scroll. El valor de `amount` será positivo para bajar y negativo para subir.
+    const handleScroll = (amount: number) => {
+        scrollRef.current?.scrollBy({
+            top: amount,
+            behavior: 'smooth' // Para que el scroll sea suave
+        });
+    };
+
+    return (
+        <div className="fixed bottom-6 right-6 flex flex-col space-y-2 z-50">
+            {/* Botón para subir */}
+            <button
+                onClick={() => handleScroll(-300)} // Un valor negativo hace scroll hacia arriba
+                aria-label="Scroll hacia arriba"
+                className="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-purple-700 transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+            </button>
+            {/* Botón para bajar */}
+            <button
+                onClick={() => handleScroll(300)} // Un valor positivo hace scroll hacia abajo
+                aria-label="Scroll hacia abajo"
+                className="w-12 h-12 bg-purple-600 text-white rounded-full flex items-center justify-center shadow-lg hover:bg-purple-700 transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-purple-400"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+            </button>
+        </div>
+    );
+};
+
+
 // --- COMPONENTE PRINCIPAL (GESTOR DE VISTAS) ---
 const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }> = ({ player, onClose }) => {
     const [allFeedback, setAllFeedback] = useState<FeedbackFromApi[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedFeedback, setSelectedFeedback] = useState<FeedbackFromApi | null>(null);
+
+    // NUEVO: Creamos un ref para cada uno de los contenedores que pueden tener scroll
+    const listContainerRef = useRef<HTMLDivElement>(null);
+    const detailContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setLoading(true);
@@ -147,10 +184,16 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
     }, [player.id]);
 
     return (
-        <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full overflow-hidden text-white">
+        // NUEVO: Añadimos 'relative' para que los botones con 'position: fixed' se posicionen correctamente dentro de este contenedor si fuera necesario, aunque en este caso se posicionarán respecto a la ventana.
+        <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full overflow-hidden text-white relative">
             {selectedFeedback ? (
                 // Si hay un feedback seleccionado, muestra la vista de detalle
-                <FeedbackDetail feedback={selectedFeedback} onBack={() => setSelectedFeedback(null)} />
+                // NUEVO: Pasamos el ref correspondiente al componente de detalle
+                <FeedbackDetail 
+                    feedback={selectedFeedback} 
+                    onBack={() => setSelectedFeedback(null)} 
+                    scrollContainerRef={detailContainerRef} 
+                />
             ) : (
                 // Si no, muestra el historial
                 <div className="flex flex-col h-full">
@@ -160,7 +203,8 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
                              <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver a Jugadores
                         </button>
                     </header>
-                    <div className="flex-grow overflow-y-auto">
+                    {/* NUEVO: Asignamos el ref al div que tiene el scroll */}
+                    <div ref={listContainerRef} className="flex-grow overflow-y-auto">
                     {loading ? <p className="text-center p-4">Cargando historial...</p> : 
                      allFeedback.length === 0 ? <p className="text-center p-4">No hay progresos registrados.</p> :
                      <FeedbackList feedbacks={allFeedback} onSelect={setSelectedFeedback} />
@@ -168,6 +212,10 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
                 </div>
             </div>
             )}
+            
+            {/* NUEVO: Renderizamos los botones de scroll y le pasamos el ref que esté activo en cada momento */}
+            <ScrollControls scrollRef={selectedFeedback ? detailContainerRef : listContainerRef} />
+            
             <style>{`.custom-scrollbar-details::-webkit-scrollbar { width: 8px; } .custom-scrollbar-details::-webkit-scrollbar-track { background: #1f2937; } .custom-scrollbar-details::-webkit-scrollbar-thumb { background: #4b5563; }`}</style>
         </div>
     );

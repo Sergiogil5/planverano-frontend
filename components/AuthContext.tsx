@@ -8,6 +8,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true); // For initial check
+  const [userProgress, setUserProgress] = useState<any[]>([]);
+  const [pausedSession, setPausedSession] = useState<any | null>(null);
+
 
   useEffect(() => {
     const checkLoggedInUser = async () => {
@@ -15,6 +18,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const user = await ApiService.getCurrentUser(); // Check if a user session exists
         setCurrentUser(user);
+        // ←←← SI HAY USUARIO, CARGA SU PROGRESO Y PAUSA ↓↓↓
+        if (user) {
+          const [progs, pause] = await Promise.all([
+            ApiService.fetchUserProgress(),
+            ApiService.fetchPausedSession()
+          ]);
+          setUserProgress(progs);
+          setPausedSession(pause);
+            // —> aquí compruebas en la consola:
+            console.log('🔄 Progreso cargado:', progs);
+            console.log('🔄 Pausa cargada:', pause);
+        }
+        // ↑↑↑ FIN CARGA AUTOMÁTICA ←←←
       } catch (error) {
         console.error("Error checking logged in user:", error);
         setCurrentUser(null);
@@ -30,6 +46,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const user = await ApiService.login(email, password_DO_NOT_USE_IN_REAL_APP);
       setCurrentUser(user);
+      // ←←← TRAS LOGIN, VUELVE A CARGAR PROGRESO Y PAUSA ↓↓↓
+      if (user) {
+        const [progs, pause] = await Promise.all([
+          ApiService.fetchUserProgress(),
+          ApiService.fetchPausedSession()
+        ]);
+        setUserProgress(progs);
+        setPausedSession(pause);
+      }
+      // ↑↑↑ FIN RECARGA TRAS LOGIN ←←←
       return user;
     } catch (error) {
       console.error("Login failed:", error);
@@ -71,6 +97,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       await ApiService.logout();
       setCurrentUser(null);
+      // ←←← LIMPIA PROGRESO Y PAUSA AL LOGOUT ↓↓↓
+      setUserProgress([]);
+      setPausedSession(null);
+      // ↑↑↑ FIN LIMPIEZA ←←←
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
@@ -79,7 +109,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, login, register, logout, loading }}>
+    <AuthContext.Provider 
+          value={{
+            currentUser,
+            userProgress,
+            pausedSession,
+            login,
+            register,
+            logout,
+            loading
+          }}
+        >
       {children}
     </AuthContext.Provider>
   );

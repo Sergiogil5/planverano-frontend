@@ -94,6 +94,10 @@ export interface AuthContextType {
   ) => Promise<User | null>;
   logout: () => void;
   loading: boolean;
+  // ←←← AÑADE ESTAS LÍNEAS ↓↓↓
+  userProgress: any[];
+  pausedSession: any | null;
+  // ↑↑↑ FIN AÑADIR
 }
 
 // --- User Progress Types ---

@@ -5,10 +5,16 @@ const API_BASE_URL = 'https://planverano-backend.onrender.com';
 const getToken = (): string | null => localStorage.getItem('jwt_token');
 const setToken = (token: string): void => localStorage.setItem('jwt_token', token);
 const removeToken = (): void => localStorage.removeItem('jwt_token');
-const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${getToken()}`,
-});
+const getAuthHeaders = (): Record<string,string> => {
+  const token = getToken();
+  const headers: Record<string,string> = {
+    'Content-Type': 'application/json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
+};
 
 const ApiService = {
     // --- Autenticación ---

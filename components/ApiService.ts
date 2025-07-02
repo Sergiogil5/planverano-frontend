@@ -20,13 +20,17 @@ const ApiService = {
         });
         if (!response.ok) {
             removeToken();
-            const errorText = await response.text().catch(() => 'Login fallido. Verifica tu email y contraseña.');
+            const errorText = await response.text().catch(() => 'Login fallido.');
             throw new Error(errorText);
         }
-        const { token } = await response.json();
+        // ¡CAMBIO CLAVE! Extraemos tanto el token como el usuario de la misma respuesta.
+        const { token, user } = await response.json();
+        if (!token || !user) {
+            throw new Error('La respuesta del login desde el servidor es inválida.');
+        }
+        // Guardamos el token
         setToken(token);
-        const user = await ApiService.getCurrentUser();
-        if (!user) throw new Error('No se pudo obtener el usuario después del login.');
+                // Devolvemos el usuario directamente. ¡Ya no hay segunda llamada!
         return user;
     },
 

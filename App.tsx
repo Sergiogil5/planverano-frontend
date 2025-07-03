@@ -416,48 +416,74 @@ const AppContent: React.FC = () => {
   };
 
   const handleCloseFeedbackView = async (feedback?: { emoji: string; label: string }) => {
-    if (feedback && currentUser && feedbackContext) { 
-      
-      // --- ¡LÓGICA DE BÚSQUEDA CORREGIDA! ---
-      
-      const sesionIdParaEnviar = feedbackContext.day.id; // <-- El ID ahora viene del estado 'weekData' que se cargó de la API
+    if (feedback && currentUser && feedbackContext) {
+      const sesionIdParaEnviar = feedbackContext.day.id;
 
-      // La comprobación de seguridad sigue siendo importante
+      // ——————————————————————————————————————————
+      // 1) Caso crítico: falta el ID → abortamos
+      // ——————————————————————————————————————————
       if (sesionIdParaEnviar === undefined) {
-      console.error("Error crítico: No se pudo encontrar el ID de la sesión en el contexto para enviar el feedback.");
+        console.error("Error crítico: No se pudo encontrar el ID de la sesión en el contexto para enviar el feedback.");
         setShowPostSessionFeedback(false);
         setFeedbackContext(null);
         document.body.style.overflow = '';
-        return;
+        return;   // Salimos aquí, no seguimos al envío
       }
-      
-      // El payload ahora usa el 'dayObject.id' que hemos encontrado
+
+      // ——————————————————————————————————————————
+      // 2) ELSE implícito: sí tengo ID → preparo payload y envío
+      // ——————————————————————————————————————————
       const feedbackPayload = {
         sesionId: sesionIdParaEnviar,
         feedbackEmoji: feedback.emoji,
         feedbackLabel: feedback.label,
-        feedbackTextoOpcional: "", // Puedes añadir este campo más adelante
+        feedbackTextoOpcional: "",
         tiemposJson: JSON.stringify(feedbackContext.exerciseActualDurations || {}),
         rutaGpsJson: JSON.stringify(feedbackContext.exerciseRoutes || {}),
       };
 
-      // La llamada a la API y la lógica de notificación no cambian
       try {
-        await ApiService.submitSessionFeedback(feedbackPayload); // Renombrado en mi sugerencia anterior, si no, usa tu nombre
-        console.log("Feedback enviado con éxito al backend real.");
-        if (currentUser.rol !== 'ENTRENADOR') { 
-            // Podríamos implementar una notificación real aquí en el futuro
-        }
+        console.log("⏳ Enviando feedback…", feedbackPayload);
+        await ApiService.submitSessionFeedback(feedbackPayload);
+        console.log("✅ Feedback enviado, recargando progreso…");
+
+        // Re-fetch del progreso actualizado  
+        const nuevosProgs = await ApiService.fetchUserProgress();
+        console.log("📥 Progreso tras feedback:", nuevosProgs);
+
+        // Reconstruyo y actualizo el estado  
+        const progressMap: Record<string, UserDayProgress> = {};
+        nuevosProgs.forEach((progreso: any) => {
+          const dayKey = `week${progreso.numeroSemana}-${progreso.tituloSesion}`;
+          progressMap[dayKey] = {
+            userId: currentUser.id,
+            dayKey,
+            allExercisesCompleted: true,
+            completedAt: progreso.fechaCompletado,
+            completedExerciseIndices: [],
+            exerciseActualDurations: progreso.tiemposJson
+              ? JSON.parse(progreso.tiemposJson)
+              : {},
+            exerciseRoutes: progreso.rutaGpsJson
+              ? JSON.parse(progreso.rutaGpsJson)
+              : {},
+          };
+        });
+        setUserProgress(progressMap);
+
       } catch (error) {
-        console.error("Error al enviar el feedback al backend:", error);
+        console.error("❌ Error al enviar o recargar feedback:", error);
       }
     }
-    
-    // La lógica de limpieza final no cambia
+
+    // ——————————————————————————————————————————
+    // 3) Cerramos siempre la vista de feedback
+    // ——————————————————————————————————————————
     setShowPostSessionFeedback(false);
-    setFeedbackContext(null); 
+    setFeedbackContext(null);
     document.body.style.overflow = '';
   };
+
 
   const handleOpenActivityLibreModal = (day: TrainingDay) => {
     if (weekData) {

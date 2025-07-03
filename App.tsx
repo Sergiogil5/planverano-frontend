@@ -94,7 +94,7 @@ const AppContent: React.FC = () => {
           const progressMap: Record<string, UserDayProgress> = {};
           
           progressDataFromApi.forEach((progreso: any) => {
-            const dayKey = `week${progreso.sesion.numeroSemana}-${progreso.sesion.titulo}`;
+            const dayKey = `week${progreso.numeroSemana}-${progreso.tituloSesion}`;
             if (!currentUser) return; // Si no hay usuario, no hacemos nada
             progressMap[dayKey] = {
               userId: currentUser.id,

@@ -440,6 +440,9 @@ const AppContent: React.FC = () => {
         feedbackTextoOpcional: "",
         tiemposJson: JSON.stringify(feedbackContext.exerciseActualDurations || {}),
         rutaGpsJson: JSON.stringify(feedbackContext.exerciseRoutes || {}),
+          // Añadido: solo si hay datos de actividad libre
+        actividadLibre: feedbackContext.activityLibreDetails?.activityType || "",
+        tiempoLibre: feedbackContext.activityLibreDetails?.timeSpent || ""
       };
 
       try {

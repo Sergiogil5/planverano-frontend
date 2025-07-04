@@ -115,6 +115,8 @@ export interface UserDayProgress {
   activityLibreDetails?: ActivityLibreDetails; // For "Actividad libre" days
   exerciseActualDurations?: ExercisePerformanceData; // To store time spent on each exercise
   exerciseRoutes?: ExerciseRoutesData; // To store GPS routes for specific exercises
+  actividadLibre?: string;
+  tiempoLibre?: string;
 }
 
 // --- API Service Types ---

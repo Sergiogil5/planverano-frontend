@@ -59,12 +59,12 @@ const DayCard: React.FC<DayCardProps> = ({
           isActivityLibreDay ? 'bg-yellow-50 text-yellow-700' : 
           isRestDay ? 'bg-indigo-50 text-indigo-700' : 'bg-blue-50 text-blue-700'
         } italic`}>
-          <p>{day.notes}</p>
-          {isActivityLibreDay && dayProgress?.activityLibreDetails && (
-            <p className="mt-1 font-medium">
-              Actividad: {dayProgress.activityLibreDetails.activityType} ({dayProgress.activityLibreDetails.timeSpent})
-            </p>
-          )}
+          {/* Descripción genérica solo si no hay personalizada */}
+          <p>
+            {dayProgress?.actividadLibre
+              ? `Actividad realizada: ${dayProgress.actividadLibre}${dayProgress.tiempoLibre ? ` — ${dayProgress.tiempoLibre}` : ''}`
+              : day.notes}
+          </p>
         </div>
       )}
 

@@ -20,6 +20,8 @@ interface FeedbackFromApi {
         titulo:string;
         bloques: ApiBloque[] | null;
     };
+    actividadLibre?: string;
+    tiempoLibre?: string;
 }
 
 // --- COMPONENTE MAPA ---
@@ -62,6 +64,14 @@ const FeedbackDetail: React.FC<{ feedback: FeedbackFromApi; onBack: () => void; 
                     <span className="text-4xl mr-3">{feedbackEmoji}</span>
                     <span className="text-lg text-gray-200">{feedbackLabel}</span>
                 </div>
+                {feedback.actividadLibre && (
+                    <div className="mb-4 p-3 bg-gray-700 rounded-lg">
+                        <p className="text-sm text-gray-200">
+                        Actividad libre: <strong>{feedback.actividadLibre}</strong>
+                        {feedback.tiempoLibre && <> — {feedback.tiempoLibre}</>}
+                        </p>
+                    </div>
+                )}
                 <div className="mt-4 pt-4 border-t border-gray-600">
                     <h4 className="text-md font-semibold text-purple-200 mb-2">Tiempos de Ejercicio:</h4>
                     {Object.keys(tiempos).length > 0 ? (

@@ -54,7 +54,7 @@ const DayCard: React.FC<DayCardProps> = ({
         </div>
       </div>
       
-      {day.notes && (
+      {(day.notes || dayProgress?.actividadLibre) && (
         <div className={`p-3 rounded-md mb-4 text-sm ${
           isActivityLibreDay ? 'bg-yellow-50 text-yellow-700' : 
           isRestDay ? 'bg-indigo-50 text-indigo-700' : 'bg-blue-50 text-blue-700'

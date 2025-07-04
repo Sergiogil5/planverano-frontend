@@ -120,7 +120,6 @@ const FeedbackList: React.FC<{ feedbacks: FeedbackFromApi[]; onSelect: (fb: Feed
     </ul>
 );
 
-const [showConfirmDeleteJugador, setShowConfirmDeleteJugador] = useState(false);
 // --- COMPONENTE PRINCIPAL ---
 const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }> = ({ player, onClose }) => {
     const [allFeedback, setAllFeedback] = useState<FeedbackFromApi[]>([]);
@@ -131,6 +130,8 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
 
     const listContainerRef = useRef<HTMLDivElement>(null);
     const detailContainerRef = useRef<HTMLDivElement>(null);
+    const [showConfirmDeleteJugador, setShowConfirmDeleteJugador] = useState(false);
+
 
     // NUEVO: El ref que está activo en cada momento (lista o detalle)
     const activeScrollRef = selectedFeedback ? detailContainerRef : listContainerRef;
@@ -184,9 +185,7 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
         }
     };
 
- 
-
-    return (
+     return (
         // CORRECCIÓN: Eliminado 'overflow-hidden' para permitir scroll natural
         <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full text-white">
             {selectedFeedback ? (
@@ -238,6 +237,7 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
                 </button>
             )}
+        
 
             <style>{`.custom-scrollbar-details::-webkit-scrollbar { width: 8px; } .custom-scrollbar-details::-webkit-scrollbar-track { background: #1f2937; } .custom-scrollbar-details::-webkit-scrollbar-thumb { background: #4b5563; }`}</style>
         </div>

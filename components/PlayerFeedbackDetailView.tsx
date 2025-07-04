@@ -120,7 +120,7 @@ const FeedbackList: React.FC<{ feedbacks: FeedbackFromApi[]; onSelect: (fb: Feed
     </ul>
 );
 
-
+const [showConfirmDeleteJugador, setShowConfirmDeleteJugador] = useState(false);
 // --- COMPONENTE PRINCIPAL ---
 const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }> = ({ player, onClose }) => {
     const [allFeedback, setAllFeedback] = useState<FeedbackFromApi[]>([]);
@@ -174,6 +174,18 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
         });
     };
 
+    const handleConfirmDeleteJugador = async () => {
+        try {
+            const result = await ApiService.deletePlayer(String(player.id));
+            console.log(result.message); // opcional: mostrar mensaje
+            onClose(); // Cierra el panel y refresca la lista de jugadores
+        } catch (err) {
+            console.error("Error al eliminar jugador:", err);
+        }
+    };
+
+ 
+
     return (
         // CORRECCIÓN: Eliminado 'overflow-hidden' para permitir scroll natural
         <div className="bg-gray-800 p-4 rounded-lg shadow-xl flex flex-col h-full text-white">
@@ -183,6 +195,10 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
                 <div className="flex flex-col h-full">
                     <header className="flex-shrink-0 flex items-center justify-between mb-4 pb-3 border-b border-gray-700">
                         <h2 className="text-xl font-semibold text-purple-300">Historial de {player.nombreCompleto}</h2>
+                        <button
+                          onClick={() => setShowConfirmDeleteJugador(true)}
+                          className="mt-2 px-3 py-2 bg-red-600 text-white rounded hover:bg-red-700"> Eliminar Jugador
+                        </button>
                         <button onClick={onClose} className="flex items-center text-sm px-3 py-2 bg-gray-700 rounded-lg hover:bg-gray-600">
                              <ChevronLeftIcon className="w-5 h-5 mr-1.5" /> Volver a Jugadores
                         </button>
@@ -195,6 +211,22 @@ const PlayerFeedbackDetailView: React.FC<{ player: User; onClose: () => void; }>
                     </div>
                 </div>
             )}
+
+            {showConfirmDeleteJugador && (
+                <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
+                    <div className="bg-white text-black p-6 rounded-lg shadow-lg max-w-sm">
+                    <h3 className="text-lg font-semibold mb-2">¿Eliminar Jugador?</h3>
+                    <p className="text-sm text-gray-600 mb-4">
+                        Esta acción eliminará al jugador de la plataforma y también su historial de progreso.
+                    </p>
+                    <div className="flex justify-end space-x-2">
+                        <button onClick={() => setShowConfirmDeleteJugador(false)} className="px-4 py-2 bg-gray-300 rounded">Cancelar</button>
+                        <button onClick={handleConfirmDeleteJugador} className="px-4 py-2 bg-red-600 text-white rounded">Eliminar</button>
+                    </div>
+                    </div>
+                </div>
+            )}
+
             
             {/* NUEVO: Botón inteligente de "Scroll hacia arriba" */}
             {showScrollTop && (
